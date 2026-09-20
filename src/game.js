@@ -897,6 +897,7 @@
             partner_id:raw.partner_id??null,
             father_id:raw.father_id??null,
             mother_id:raw.mother_id??null,
+            household_id:raw.household_id??null,
             agriculture:Number(raw.agriculture??0),
             hunting:Number(raw.hunting??0),
             building:Number(raw.building??0),
@@ -905,8 +906,13 @@
           };
         }
         const h=hash(data.name+"-"+data.id);
-        const x=920+(h%320), y=610+((h>>>8)%250);
-        const person=this.makePerson({...data,x,y});
+        const household=data.live&&data.household_id
+          ? (liveSnapshot?.households||[]).find(x=>Number(x.id)===Number(data.household_id))
+          : null;
+        const homeX=household&&Number.isFinite(Number(household.x))?Number(household.x):920+(h%320);
+        const homeY=household&&Number.isFinite(Number(household.y))?Number(household.y):610+((h>>>8)%250);
+        const x=homeX-18+(h%37), y=homeY+18+((h>>>9)%24);
+        const person=this.makePerson({...data,x,y,homeX,homeY});
         this.people.push(person);
         this.runPersonCycle(person,500+i*95);
       });
@@ -1049,7 +1055,7 @@
         activity:"En casa",
         visualKey:characterKey(data.role,data.sex,data.age),
         visualUrl:characterUrl(data.role,data.sex,data.age),
-        home:{x:data.x,y:data.y}
+        home:{x:data.homeX??data.x,y:data.homeY??data.y}
       };
       c.parts={marker,ring,label,sprite,badge,baseScale};
       c.on("pointerdown",(pointer)=>{
@@ -1213,7 +1219,8 @@
       portrait.alt=`Retrato de ${p.name}`;
     }
     $("personName").textContent=p.name;
-    $("personMeta").textContent=`${p.age} años · ${p.role} · ${p.sex==="F"?"mujer":"hombre"}`;
+    const household=p.household_id?(liveSnapshot?.households||[]).find(h=>Number(h.id)===Number(p.household_id)):null;
+    $("personMeta").textContent=`${p.age} años · ${p.role} · ${p.sex==="F"?"mujer":"hombre"}${household?` · ${household.name}`:""}`;
     $("personActivity").textContent=p.activity;
     $("personHealth").textContent=`${p.health}%`;
     $("personEnergy").textContent=`${Math.round(p.energy)}%`;
