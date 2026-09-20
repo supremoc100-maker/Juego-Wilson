@@ -369,6 +369,7 @@
       const rail2=this.add.rectangle(0,7,length,5,0x6b5036);
       c.add([rail1,rail2]);
       for(let px=-length/2;px<=length/2;px+=30)c.add(this.add.rectangle(px,1,6,31,0x705237));
+      return c;
     }
 
     makeCrate(x,y,s=1){
@@ -388,6 +389,7 @@
         const end=this.add.circle(-4+i*13,0-(i%2)*8,4,0xb18959).setStrokeStyle(1,0x5b422c);
         c.add([log,end]);
       }
+      return c;
     }
 
     makeCampfire(x,y){
