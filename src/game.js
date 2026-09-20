@@ -126,6 +126,9 @@
           explorationTrips:0,
           expansionProgress:0,
           expansionActive:false,
+          expansionId:null,
+          expansionStatus:null,
+          expansionTarget:{x:1900,y:260},
           constructionIndex:0,
           construction:null
         };
@@ -579,7 +582,43 @@
       this.time.delayedCall(6500,()=>this.ensureConstructionProject(false));
     }
 
+    syncExpansion(row){
+      if(!row){
+        if(liveMode){
+          this.visualStory.expansionActive=false;
+          this.visualStory.expansionStatus=null;
+        }
+        return;
+      }
+
+      const nextId=Number(row.id);
+      const changed=this.visualStory.expansionId!==nextId;
+      if(changed&&this.expansionCamp){
+        if(this.visualStory.expansionStatus==="integrated"){
+          this.storyStructures.push(this.expansionCamp);
+        }else{
+          this.expansionCamp.destroy(true);
+        }
+        this.expansionCamp=null;
+      }
+
+      this.visualStory.expansionId=nextId;
+      this.visualStory.expansionStatus=row.status||"surveying";
+      this.visualStory.expansionProgress=clamp(Number(row.progress||0),0,1);
+      this.visualStory.expansionActive=row.status!=="integrated";
+      this.visualStory.expansionTarget={
+        x:Number(row.target_x||1900),
+        y:Number(row.target_y||260)
+      };
+      this.expansionLabel.setPosition(this.visualStory.expansionTarget.x,this.visualStory.expansionTarget.y-55);
+      this.updateExpansionVisual();
+    }
+
     activateExpansion(){
+      if(liveMode){
+        showActivity("La orden de expansión está activa; el consejo elegirá un destino real en el siguiente ciclo de simulación.");
+        return;
+      }
       if(this.visualStory.expansionActive){
         showActivity("La expedición de expansión continúa avanzando hacia la frontera.");
         return;
@@ -594,11 +633,21 @@
 
     updateExpansionVisual(){
       const v=clamp(this.visualStory.expansionProgress,0,1);
+      const target=this.visualStory.expansionTarget||{x:1900,y:260};
+      const start={x:1300,y:650};
+      const dx=target.x-start.x,dy=target.y-start.y;
+      const len=Math.max(1,Math.hypot(dx,dy));
+      const px=-dy/len,py=dx/len;
+      const points=[
+        start,
+        {x:start.x+dx*.28+px*28,y:start.y+dy*.28+py*28},
+        {x:start.x+dx*.54-px*22,y:start.y+dy*.54-py*22},
+        {x:start.x+dx*.78+px*14,y:start.y+dy*.78+py*14},
+        target
+      ];
+
       this.expansionTrail.clear();
       this.expansionArea.clear();
-      const points=[
-        {x:1300,y:650},{x:1490,y:540},{x:1650,y:420},{x:1790,y:315},{x:1900,y:260}
-      ];
       const usable=Math.max(2,Math.ceil(1+v*(points.length-1)));
       this.expansionTrail.lineStyle(24,0x9d8b67,.25+.42*v);
       this.expansionTrail.beginPath();
@@ -613,24 +662,40 @@
 
       if(v>.28){
         const radius=35+v*75;
-        this.expansionArea.fillStyle(0x9d9368,.12+.16*v).fillCircle(1900,260,radius);
-        this.expansionArea.lineStyle(3,0xc5b27c,.28+.28*v).strokeCircle(1900,260,radius);
+        this.expansionArea.fillStyle(0x9d9368,.12+.16*v).fillCircle(target.x,target.y,radius);
+        this.expansionArea.lineStyle(3,0xc5b27c,.28+.28*v).strokeCircle(target.x,target.y,radius);
       }
-      if(v>.52&&!this.expansionCamp){
-        this.expansionCamp=this.add.container(1900,270).setDepth(300);
+
+      const status=this.visualStory.expansionStatus;
+      if((v>.65||status==="camp"||status==="integrated")&&!this.expansionCamp){
+        this.expansionCamp=this.add.container(target.x,target.y+10).setDepth(300);
         const shadow=this.add.ellipse(0,17,70,20,0x203024,.25);
         const tent=this.add.triangle(0,-7,-35,25,0,-28,35,25,0x8e6848).setStrokeStyle(2,0x55402f);
         const flap=this.add.triangle(0,2,-9,19,0,-8,9,19,0x4e3e31);
         const flag=this.add.rectangle(31,-28,3,44,0x61462e);
         const cloth=this.add.triangle(42,-39,31,-48,31,-29,0x536d55);
         this.expansionCamp.add([shadow,tent,flap,flag,cloth]);
-        updateEvent("Campamento de frontera","La expedición ha establecido presencia permanente fuera del núcleo.");
+      }else if(this.expansionCamp){
+        this.expansionCamp.setPosition(target.x,target.y+10);
       }
-      this.expansionLabel.setAlpha(.55+.45*v);
-      if(v>=1)this.expansionLabel.setText("NUEVA ZONA INTEGRADA");
+
+      const labels={
+        surveying:"RECONOCIMIENTO",
+        route:"RUTA DE EXPANSIÓN",
+        camp:"CAMPAMENTO DE FRONTERA",
+        integrated:"NUEVA REGIÓN INTEGRADA"
+      };
+      this.expansionLabel
+        .setPosition(target.x,target.y-55)
+        .setText(labels[status]||"EXPANSIÓN EN CURSO")
+        .setAlpha(.55+.45*Math.max(v,.15));
     }
 
     advanceExpansion(person,amount=.14){
+      if(liveMode){
+        showActivity(person.person.name+" trabaja en la expedición; el avance territorial real lo calcula la simulación.");
+        return;
+      }
       if(!this.visualStory.expansionActive)this.activateExpansion();
       this.visualStory.expansionProgress=Math.min(1,this.visualStory.expansionProgress+amount);
       this.updateExpansionVisual();
@@ -824,19 +889,27 @@
         }
 
         if(role==="explorador"){
-          if(activeCommands.has("expand")||this.visualStory.expansionActive){
-            this.activateExpansion();
-            this.moveRoute(person,[
-              {x:1320,y:640,activity:"Abandonando el núcleo"},
-              {x:1510,y:520,activity:"Siguiendo la ruta de expansión"},
-              {x:1690,y:400,activity:"Explorando terreno nuevo"},
-              {x:1900,y:260,activity:"Reconociendo la nueva zona"}
-            ],()=>this.performWork(person,"Cartografiando la frontera",1500,()=>{
+          const expansionIntent=liveMode
+            ? this.visualStory.expansionActive
+            : (activeCommands.has("expand")||this.visualStory.expansionActive);
+
+          if(expansionIntent){
+            if(!liveMode)this.activateExpansion();
+            const target=this.visualStory.expansionTarget||{x:1900,y:260};
+            const start={x:1320,y:640};
+            const dx=target.x-start.x,dy=target.y-start.y;
+            const route=[
+              {x:start.x,y:start.y,activity:"Abandonando el núcleo"},
+              {x:start.x+dx*.35,y:start.y+dy*.35,activity:"Siguiendo la ruta de expansión"},
+              {x:start.x+dx*.68,y:start.y+dy*.68,activity:"Atravesando territorio nuevo"},
+              {x:target.x,y:target.y,activity:"Reconociendo la región objetivo"}
+            ];
+            this.moveRoute(person,route,()=>this.performWork(person,"Trabajando en la expedición territorial",1500,()=>{
               this.advanceExpansion(person,.12);
               this.visualStory.explorationTrips++;
               this.moveRoute(person,[
-                {x:1690,y:400,activity:"Regresando de la frontera"},
-                {x:1450,y:550,activity:"Volviendo con información"},
+                {x:start.x+dx*.68,y:start.y+dy*.68,activity:"Regresando de la frontera"},
+                {x:start.x+dx*.35,y:start.y+dy*.35,activity:"Volviendo con información"},
                 {x:1120,y:700,activity:"Informando al consejo"}
               ],()=>this.movePersonTo(person,home,"Regresando a casa",rest));
             }));
@@ -1009,6 +1082,7 @@
       syncActiveOrders(snapshot.orders||[]);
       if(Array.isArray(snapshot.buildings))this.syncBuildings(snapshot.buildings,snapshot.building_instances||null);
       this.syncProjects(snapshot.projects||[]);
+      this.syncExpansion(snapshot.expansion||null);
 
       if(replacePeople&&Array.isArray(snapshot.people)){
         this.clearPeople();
@@ -1434,7 +1508,7 @@
     btn.classList.toggle("active",activate);
     btn.setAttribute("aria-pressed",activate?"true":"false");
 
-    if(activate&&type==="expand")sceneRef?.activateExpansion();
+    if(activate&&type==="expand"&&!liveMode)sceneRef?.activateExpansion();
     if(activate&&type==="housing"&&!liveMode)sceneRef?.ensureConstructionProject(true);
 
     const activeLabels=[...activeCommands].map(commandLabel);
