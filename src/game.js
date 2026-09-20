@@ -1032,23 +1032,24 @@
           if(liveTask.task_type==="resource_harvest"){
             const resource=liveTask.resource_type==="wood"?"wood":"stone";
             const label=resource==="wood"?"madera":"piedra";
-            let workTarget=source;
-            let visualNode=null;
-            if(resource==="wood"){
-              const candidates=this.resourceTrees.filter(n=>n.zone==="forest"&&!n.harvested&&n.container.visible);
-              candidates.sort((a,b)=>Phaser.Math.Distance.Between(source.x,source.y,a.x,a.y)-Phaser.Math.Distance.Between(source.x,source.y,b.x,b.y));
-              visualNode=candidates[0]||null;
-              if(visualNode)workTarget={x:visualNode.x,y:visualNode.y};
-            }else{
-              const candidates=this.resourceRocks.filter(n=>!n.harvested&&n.rock.visible);
-              candidates.sort((a,b)=>Phaser.Math.Distance.Between(source.x,source.y,a.x,a.y)-Phaser.Math.Distance.Between(source.x,source.y,b.x,b.y));
-              visualNode=candidates[0]||null;
-              if(visualNode)workTarget={x:visualNode.x,y:visualNode.y};
-            }
-            this.movePersonTo(person,workTarget,resource==="wood"?"Llegando al árbol asignado":"Llegando a la cantera",()=>{
-              this.performWork(person,resource==="wood"?"Talando madera":"Extrayendo piedra",1500,()=>{
-                if(resource==="wood"&&visualNode)this.markTreeHarvested(visualNode,person);
-                if(resource==="stone"&&visualNode)this.markRockHarvested(visualNode);
+            const exactNode=this.resourceNodeVisuals?.get(Number(liveTask.source_node_id))||null;
+            const workTarget=exactNode
+              ? {x:Number(exactNode.x),y:Number(exactNode.y)}
+              : source;
+            this.movePersonTo(person,workTarget,resource==="wood"?"Llegando al árbol #"+liveTask.source_node_id:"Llegando a la roca #"+liveTask.source_node_id,()=>{
+              const visualTarget=resource==="wood"?exactNode?.container:exactNode?.rock;
+              let nodeTween=null;
+              if(visualTarget){
+                nodeTween=this.tweens.add({
+                  targets:visualTarget,
+                  angle:{from:-2,to:2},
+                  scaleX:{from:.98,to:1.02},
+                  duration:120,yoyo:true,repeat:8
+                });
+              }
+              this.performWork(person,resource==="wood"?"Talando el árbol #"+liveTask.source_node_id:"Extrayendo de la roca #"+liveTask.source_node_id,1500,()=>{
+                nodeTween?.stop();
+                if(visualTarget?.setAngle)visualTarget.setAngle(0);
                 this.setCarry(person,resource,true);
                 this.movePersonTo(person,target,"Transportando "+label+" al depósito",()=>{
                   this.setCarry(person,resource,false);
