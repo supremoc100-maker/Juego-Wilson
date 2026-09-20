@@ -117,6 +117,7 @@
         this.cameras.main.setBounds(0,0,WORLD_W,WORLD_H);
         this.physics.world.setBounds(0,0,WORLD_W,WORLD_H);
         this.resourceTrees=[];
+        this.resourceRocks=[];
         this.storyStructures=[];
         this.storyEffects=[];
         this.projectVisuals=[];
@@ -274,7 +275,37 @@
       const frame=["medievalEnvironment_07.png","medievalEnvironment_08.png","medievalEnvironment_09.png","medievalEnvironment_10.png","medievalEnvironment_15.png","medievalEnvironment_16.png"][h%6];
       const rock=this.add.image(x,y,"kenney",frame).setOrigin(.5,.78).setDepth(y);
       rock.setScale((.95+((h>>>7)%22)/100)*s);
+      this.resourceRocks.push({id:"rock-"+this.resourceRocks.length,x,y,rock,harvested:false});
       return rock;
+    }
+
+    syncResourceDepletion(regions){
+      const rows=regions||[];
+      const woodNow=rows.reduce((s,r)=>s+Number(r.wood_stock||0),0);
+      const woodCap=rows.reduce((s,r)=>s+Number(r.wood_capacity||r.wood_stock||0),0);
+      const stoneNow=rows.reduce((s,r)=>s+Number(r.stone_stock||0),0);
+      const stoneCap=rows.reduce((s,r)=>s+Number(r.stone_capacity||r.stone_stock||0),0);
+      const woodRatio=woodCap>0?clamp(woodNow/woodCap,0,1):1;
+      const stoneRatio=stoneCap>0?clamp(stoneNow/stoneCap,0,1):1;
+
+      const forest=this.resourceTrees.filter(t=>t.zone==="forest");
+      const visibleTrees=Math.max(6,Math.round(forest.length*woodRatio));
+      forest.forEach((node,i)=>{
+        if(node.harvested)node.container.setVisible(false);
+        else node.container.setVisible(i<visibleTrees);
+      });
+      const visibleRocks=Math.max(3,Math.round(this.resourceRocks.length*stoneRatio));
+      this.resourceRocks.forEach((node,i)=>{
+        if(node.harvested)node.rock.setVisible(false);
+        else node.rock.setVisible(i<visibleRocks);
+      });
+      this.resourcePressure={woodNow,woodCap,stoneNow,stoneCap,woodRatio,stoneRatio};
+    }
+
+    markRockHarvested(node){
+      if(!node||node.harvested)return;
+      node.harvested=true;
+      this.tweens.add({targets:node.rock,alpha:.08,scaleX:.45,scaleY:.45,duration:650,onComplete:()=>node.rock.setVisible(false)});
     }
 
     drawVillage(){
@@ -934,6 +965,37 @@
             x:Number(liveTask.source_x??1260),
             y:Number(liveTask.source_y??680)
           };
+          if(liveTask.task_type==="resource_harvest"){
+            const resource=liveTask.resource_type==="wood"?"wood":"stone";
+            const label=resource==="wood"?"madera":"piedra";
+            let workTarget=source;
+            let visualNode=null;
+            if(resource==="wood"){
+              const candidates=this.resourceTrees.filter(n=>n.zone==="forest"&&!n.harvested&&n.container.visible);
+              candidates.sort((a,b)=>Phaser.Math.Distance.Between(source.x,source.y,a.x,a.y)-Phaser.Math.Distance.Between(source.x,source.y,b.x,b.y));
+              visualNode=candidates[0]||null;
+              if(visualNode)workTarget={x:visualNode.x,y:visualNode.y};
+            }else{
+              const candidates=this.resourceRocks.filter(n=>!n.harvested&&n.rock.visible);
+              candidates.sort((a,b)=>Phaser.Math.Distance.Between(source.x,source.y,a.x,a.y)-Phaser.Math.Distance.Between(source.x,source.y,b.x,b.y));
+              visualNode=candidates[0]||null;
+              if(visualNode)workTarget={x:visualNode.x,y:visualNode.y};
+            }
+            this.movePersonTo(person,workTarget,resource==="wood"?"Llegando al árbol asignado":"Llegando a la cantera",()=>{
+              this.performWork(person,resource==="wood"?"Talando madera":"Extrayendo piedra",1500,()=>{
+                if(resource==="wood"&&visualNode)this.markTreeHarvested(visualNode,person);
+                if(resource==="stone"&&visualNode)this.markRockHarvested(visualNode);
+                this.setCarry(person,resource,true);
+                this.movePersonTo(person,target,"Transportando "+label+" al depósito",()=>{
+                  this.setCarry(person,resource,false);
+                  this.performWork(person,"Descargando "+Number(liveTask.amount||0).toFixed(1)+" de "+label,700,()=>{
+                    this.movePersonTo(person,home,"Regresando después de extraer recursos",rest);
+                  });
+                });
+              });
+            });
+            return;
+          }
           if(liveTask.task_type==="food_transport"){
             const sourceName=liveTask.source_building_name||"la granja";
             const targetName=liveTask.target_building_name||"el granero";
@@ -977,6 +1039,10 @@
         }
 
         if(role==="leñador"){
+          if(liveMode){
+            this.movePersonTo(person,{x:1435,y:675},"Mantenimiento de herramientas y espera de una tarea de tala",()=>this.movePersonTo(person,home,"Regresando a casa",rest));
+            return;
+          }
           const tree=this.nearestTree(person);
           if(!tree){this.movePersonTo(person,home,"Regresando a casa",rest);return}
           const route=[
@@ -1000,6 +1066,10 @@
         }
 
         if(role==="constructor"){
+          if(liveMode){
+            this.movePersonTo(person,{x:1120,y:720},"Disponible para obra o cantera",()=>this.movePersonTo(person,home,"Regresando a casa",rest));
+            return;
+          }
           if(activeCommands.has("housing"))this.ensureConstructionProject(true);
           const project=this.visualStory.construction;
           if(!project||project.complete){this.movePersonTo(person,home,"Esperando una nueva obra",rest);return}
@@ -1022,6 +1092,11 @@
             {x:660,y:900,activity:"Siguiendo el camino agrícola"},
             {x:field.x,y:field.y,activity:"Llegando a su parcela"}
           ],()=>this.performWork(person,"Trabajando su parcela",1800,()=>{
+            if(liveMode){
+              this.visualStory.cropsDelivered++;
+              this.movePersonTo(person,home,"Terminando la jornada agrícola",rest);
+              return;
+            }
             this.visualStory.cropsDelivered++;
             this.setCarry(person,"food",true);
             this.moveRoute(person,[
@@ -1231,6 +1306,7 @@
       syncActiveOrders(snapshot.orders||[]);
       if(Array.isArray(snapshot.buildings))this.syncBuildings(snapshot.buildings,snapshot.building_instances||null);
       this.syncProjects(snapshot.projects||[]);
+      this.syncResourceDepletion(snapshot.regions||[]);
       this.syncExpansionHistory(snapshot.expansion_history||[]);
       this.syncExpansion(snapshot.expansion||null);
 
@@ -1521,7 +1597,7 @@
     root.innerHTML="";
     const symbols={
       nacimiento:"✦",muerte:"†",construccion:"⌂",familia:"♥",
-      politica:"⚑",bestia:"!",mayoria_edad:"↑",exploracion:"⌖",logistica:"↔"
+      politica:"⚑",bestia:"!",mayoria_edad:"↑",exploracion:"⌖",logistica:"↔",extraccion:"⛏"
     };
     for(const event of (events||[]).slice(0,5)){
       const row=document.createElement("div");
@@ -1611,7 +1687,10 @@
       const inv=liveSnapshot?.inventories||[];
       const storedFood=inv.filter(i=>i.resource_type==="food").reduce((sum,i)=>sum+Number(i.quantity||0),0);
       const transitFood=(liveSnapshot?.tasks||[]).filter(t=>t.task_type==="food_transport").reduce((sum,t)=>sum+Number(t.amount||0),0);
-      showActivity(s?`Reservas: ${Math.round(Number(s.food||0))} comida (${Math.round(storedFood)} almacenada · ${Math.round(transitFood)} en tránsito) · ${Math.round(Number(s.wood||0))} madera · ${Math.round(Number(s.stone||0))} piedra.`:"Los recursos aparecerán al conectar la simulación persistente.");
+      const regions=liveSnapshot?.regions||[];
+      const territorialWood=regions.reduce((sum,r)=>sum+Number(r.wood_stock||0),0);
+      const territorialStone=regions.reduce((sum,r)=>sum+Number(r.stone_stock||0),0);
+      showActivity(s?`Reservas: ${Math.round(Number(s.food||0))} comida (${Math.round(storedFood)} almacenada · ${Math.round(transitFood)} en tránsito) · ${Math.round(Number(s.wood||0))} madera almacenada + ${Math.round(territorialWood)} en territorio · ${Math.round(Number(s.stone||0))} piedra almacenada + ${Math.round(territorialStone)} en territorio.`:"Los recursos aparecerán al conectar la simulación persistente.");
     }else if(view==="explore"){
       sceneRef.cameras.main.pan(ZONES.explore.x,ZONES.explore.y,500,"Sine.easeInOut");
       showActivity("La cámara se desplaza hacia la frontera de exploración.");
