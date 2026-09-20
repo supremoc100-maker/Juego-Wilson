@@ -19,8 +19,12 @@
   ];
 
   const ROLE_COLORS = {
-    agricultor:0xa99c55,cazador:0x80543e,explorador:0x507d86,constructor:0xa7794d,
-    leñador:0x668253,recolector:0x746781,"niño":0x9e8b72
+    agricultor:0x9c944f,cazador:0x76503e,explorador:0x476f78,constructor:0x9a7249,
+    leñador:0x5d7549,recolector:0x6e6079,"niño":0xa18c70
+  };
+  const ROLE_ACCENTS = {
+    agricultor:0xd4bc68,cazador:0xa78258,explorador:0x8ab3b3,constructor:0xc99559,
+    leñador:0x96a963,recolector:0xa591af,"niño":0xc8ae83
   };
   const ROLE_LABEL = {
     agricultor:"Agricultura",cazador:"Caza",explorador:"Exploración",constructor:"Construcción",
@@ -151,6 +155,22 @@
       f.fillStyle(0x7d713a,.86).fillRoundedRect(330,850,330,240,18);
       for(let i=0;i<9;i++){f.lineStyle(8,i%2?0xb3a452:0x918741,.85);f.lineBetween(350,875+i*23,638,875+i*23)}
 
+      // Ground texture: grass tufts, wild flowers and worn stones.
+      for(let i=0;i<145;i++){
+        const h=hash("ground-detail-"+i);
+        const x=45+(h%2100), y=80+((h>>>9)%1240);
+        if(Phaser.Math.Distance.Between(x,y,1080,720)<265)continue;
+        const detail=this.add.container(x,y).setDepth(-6);
+        if(i%5===0){
+          detail.add(this.add.circle(0,0,2.2,[0xd0b86c,0xc98a78,0xe0d5a2][h%3],.72));
+          detail.add(this.add.circle(4,-2,1.8,0xe8ddae,.55));
+        }else{
+          const blade1=this.add.rectangle(-2,0,2,9,0x526e46,.55).setAngle(-18);
+          const blade2=this.add.rectangle(2,0,2,10,0x607d50,.55).setAngle(16);
+          detail.add([blade1,blade2]);
+        }
+      }
+
       // zone labels
       this.zoneLabel(485,830,"CAMPOS");
       this.zoneLabel(1780,220,"BOSQUE");
@@ -163,12 +183,20 @@
     }
 
     makeTree(x,y,s=1){
+      const h=hash("tree-style-"+Math.round(x)+"-"+Math.round(y));
       const c=this.add.container(x,y).setDepth(y);
-      const trunk=this.add.rectangle(0,14,11*s,26*s,0x624b35);
-      const crown=this.add.circle(0,-2,22*s,0x355838);
-      const crown2=this.add.circle(-12*s,3,16*s,0x456b43);
-      const crown3=this.add.circle(13*s,4,17*s,0x40653f);
-      c.add([trunk,crown,crown2,crown3]);
+      const shadow=this.add.ellipse(5,23,50*s,18*s,0x243326,.20);
+      const trunk=this.add.rectangle(0,15,10*s,34*s,0x614932).setStrokeStyle(1,0x493624,.45);
+      const trunkHi=this.add.rectangle(-2,12,2*s,25*s,0x876849,.45);
+      const baseColor=[0x315337,0x3a5d3b,0x426842][h%3];
+      const lightColor=[0x50794c,0x557f50,0x5b844f][(h>>>4)%3];
+      const crown1=this.add.circle(0,-10,22*s,baseColor);
+      const crown2=this.add.circle(-14*s,-2,17*s,baseColor);
+      const crown3=this.add.circle(15*s,-1,18*s,baseColor);
+      const crown4=this.add.circle(3*s,-24,15*s,lightColor,.94);
+      const glint=this.add.circle(-8*s,-15*s,7*s,0x759665,.28);
+      c.add([shadow,trunk,trunkHi,crown1,crown2,crown3,crown4,glint]);
+      return c;
     }
 
     makeRock(x,y,s=1){
@@ -179,35 +207,149 @@
 
     drawVillage(){
       const village=this.add.graphics().setDepth(-5);
-      village.fillStyle(0x76885e,.75).fillCircle(1080,720,330);
-      village.lineStyle(3,0x514c39,.45).strokeCircle(1080,720,330);
+      village.fillStyle(0x72845c,.75).fillCircle(1080,720,345);
+      village.fillStyle(0x84906a,.28).fillCircle(1080,720,285);
+      village.lineStyle(3,0x514c39,.38).strokeCircle(1080,720,345);
+
+      // Small worn-earth patches around the settlement.
+      const worn=this.add.graphics().setDepth(-4);
+      [[980,690,150,65],[1170,725,170,70],[1060,820,180,56],[1080,610,180,58]].forEach(([x,y,w,h])=>{
+        worn.fillStyle(0x9b8966,.20).fillEllipse(x,y,w,h);
+      });
 
       const houses=[
-        [890,610],[1010,555],[1160,580],[1280,650],[910,760],[1020,815],[1195,820],[1320,760]
+        [885,610,"Vivienda","home",0],
+        [1005,555,"Vivienda","home",1],
+        [1165,575,"Vivienda","home",2],
+        [1290,650,"Almacén","storage",1],
+        [900,765,"Vivienda","home",2],
+        [1025,820,"Taller","workshop",0],
+        [1195,825,"Vivienda","home",1],
+        [1320,760,"Vivienda","home",0]
       ];
-      houses.forEach((p,i)=>this.makeHouse(p[0],p[1],i===3?"Almacén":i===5?"Taller":"Vivienda",i===3?0x5b4b35:0x7a4b34));
+      houses.forEach(([x,y,label,kind,variant],i)=>{
+        this.makeHouse(x,y,label,kind,variant);
+        if(i===0||i===2||i===6)this.makeSmoke(x+34,y-62,0.75+i*.04);
+      });
+
+      // Fences and little work clutter make the settlement read as inhabited.
+      this.makeFence(790,700,125,0);
+      this.makeFence(1265,875,135,-8);
+      this.makeCrate(1245,690,1);
+      this.makeCrate(1270,704,.82);
+      this.makeCrate(1065,855,.82);
+      this.makeLogPile(825,790);
+      this.makeCampfire(1115,745);
 
       // well
-      const well=this.add.container(1080,700).setDepth(705);
-      well.add(this.add.ellipse(0,10,48,24,0x55594f));
-      well.add(this.add.ellipse(0,4,39,18,0x1f3537));
-      well.add(this.add.rectangle(-16,-18,5,42,0x6c5539));
-      well.add(this.add.rectangle(16,-18,5,42,0x6c5539));
-      well.add(this.add.rectangle(0,-36,40,5,0x6c5539));
+      const well=this.add.container(1080,690).setDepth(705);
+      const wellShadow=this.add.ellipse(1,17,58,21,0x263126,.22);
+      const stone=this.add.ellipse(0,8,54,27,0x716f60).setStrokeStyle(2,0x4d5048);
+      const water=this.add.ellipse(0,4,41,18,0x355f65).setStrokeStyle(1,0x9aa99a,.35);
+      const postL=this.add.rectangle(-18,-19,6,47,0x65492f);
+      const postR=this.add.rectangle(18,-19,6,47,0x65492f);
+      const beam=this.add.rectangle(0,-40,44,6,0x65492f);
+      const rope=this.add.rectangle(0,-21,2,30,0xa9966b);
+      well.add([wellShadow,stone,water,postL,postR,beam,rope]);
 
-      this.add.text(1080,470,"PRIMER ASENTAMIENTO",{fontFamily:"Spectral",fontSize:"24px",fontStyle:"700",color:"#f5edd3",backgroundColor:"#152019cc",padding:{x:10,y:5}}).setOrigin(.5).setDepth(5000);
+      this.add.text(1080,455,"PRIMER ASENTAMIENTO",{fontFamily:"Spectral",fontSize:"24px",fontStyle:"700",color:"#f6edd2",backgroundColor:"#152019cc",padding:{x:11,y:5}}).setOrigin(.5).setDepth(5000);
     }
 
-    makeHouse(x,y,label,roofColor){
+    makeHouse(x,y,label,kind="home",variant=0){
+      const c=this.add.container(x,y).setDepth(y+42);
+      const widths=[82,90,76], heights=[58,64,55];
+      const w=kind==="storage"?104:kind==="workshop"?96:widths[variant%3];
+      const h=kind==="storage"?68:kind==="workshop"?62:heights[variant%3];
+      const roofColor=kind==="storage"?0x574636:kind==="workshop"?0x72452f:[0x846044,0x73513a,0x906b49][variant%3];
+      const wallColor=kind==="storage"?0xb29268:kind==="workshop"?0xbc9870:[0xc6a77b,0xbfa27c,0xcfb487][variant%3];
+
+      const shadow=this.add.ellipse(5,h/2+14,w+30,30,0x223025,.24);
+      const wall=this.add.rectangle(0,0,w,h,wallColor).setStrokeStyle(2,0x6c5339,.8);
+      const lower=this.add.rectangle(0,h/2-7,w-5,12,0x9b7a55,.28);
+      const roof=this.add.triangle(0,-h/2-27,-w*.66,18,0,-40,w*.66,18,roofColor).setStrokeStyle(2,0x493225,.85);
+      const roofBand=this.add.rectangle(0,-h/2-8,w+12,6,0x5b3b2d,.55);
+      const beamL=this.add.rectangle(-w/2+10,0,4,h-4,0x76583a,.6);
+      const beamR=this.add.rectangle(w/2-10,0,4,h-4,0x76583a,.6);
+      const door=this.add.rectangle(0,h/2-13,17,28,0x5b3d2d).setStrokeStyle(1,0x40291f);
+      const latch=this.add.circle(5,h/2-14,1.8,0xd1aa65);
+      const winColor=0x739397;
+      const window1=this.add.rectangle(-w*.27,-3,13,12,winColor).setStrokeStyle(2,0x5b4935);
+      const window2=this.add.rectangle(w*.27,-3,13,12,winColor).setStrokeStyle(2,0x5b4935);
+
+      c.add([shadow,wall,lower,roof,roofBand,beamL,beamR,door,latch,window1,window2]);
+
+      if(kind==="storage"){
+        const sign=this.add.rectangle(0,-3,34,12,0x6f5638).setStrokeStyle(1,0x463322);
+        const brace1=this.add.rectangle(-30,5,4,44,0x715238).setAngle(-12);
+        const brace2=this.add.rectangle(30,5,4,44,0x715238).setAngle(12);
+        c.add([sign,brace1,brace2]);
+      }
+      if(kind==="workshop"){
+        const awning=this.add.rectangle(w/2+7,9,27,8,0x6c4b34).setAngle(-7);
+        const bench=this.add.rectangle(w/2+18,24,32,6,0x765437);
+        c.add([awning,bench]);
+      }
+
+      const chimney=this.add.rectangle(w*.28,-h/2-38,12,29,0x776456).setStrokeStyle(1,0x4b4039);
+      c.add(chimney);
+
+      const tag=this.add.text(0,h/2+28,label,{fontFamily:"Manrope",fontSize:"10px",fontStyle:"600",color:"#f6edd5",backgroundColor:"#17221ac7",padding:{x:5,y:2}}).setOrigin(.5);
+      c.add(tag);
+      return c;
+    }
+
+    makeSmoke(x,y,scale=1){
+      const smoke=this.add.container(x,y).setDepth(4000);
+      for(let i=0;i<4;i++){
+        const puff=this.add.circle(i*2,0,6+i*2,0xd8d2c4,.28-i*.04);
+        smoke.add(puff);
+        this.tweens.add({
+          targets:puff,
+          y:-42-i*8,x:Phaser.Math.Between(-10,12),
+          alpha:0,scale:1.45,
+          duration:2400+i*260,repeat:-1,delay:i*520
+        });
+      }
+      smoke.setScale(scale);
+    }
+
+    makeFence(x,y,length=120,angle=0){
+      const c=this.add.container(x,y).setDepth(y+10).setAngle(angle);
+      const rail1=this.add.rectangle(0,-5,length,5,0x80603e);
+      const rail2=this.add.rectangle(0,7,length,5,0x6b5036);
+      c.add([rail1,rail2]);
+      for(let px=-length/2;px<=length/2;px+=30)c.add(this.add.rectangle(px,1,6,31,0x705237));
+    }
+
+    makeCrate(x,y,s=1){
+      const c=this.add.container(x,y).setDepth(y+30).setScale(s);
+      const shadow=this.add.ellipse(2,8,31,11,0x243026,.2);
+      const box=this.add.rectangle(0,0,25,22,0x89643f).setStrokeStyle(2,0x5c432e);
+      const slat=this.add.rectangle(0,0,23,3,0xb08758,.7);
+      c.add([shadow,box,slat]);
+    }
+
+    makeLogPile(x,y){
       const c=this.add.container(x,y).setDepth(y+30);
-      const shadow=this.add.ellipse(0,24,95,28,0x263126,.24);
-      const wall=this.add.rectangle(0,0,76,58,0xc4a67c).setStrokeStyle(2,0x795e42);
-      const roof=this.add.triangle(0,-43,-50,15,0,-36,50,15,roofColor).setStrokeStyle(2,0x513525);
-      const door=this.add.rectangle(0,12,16,27,0x5b3d2d);
-      const window1=this.add.rectangle(-24,-2,12,12,0x77969a);
-      const window2=this.add.rectangle(24,-2,12,12,0x77969a);
-      const tag=this.add.text(0,42,label,{fontFamily:"Manrope",fontSize:"11px",color:"#f2e8cb",backgroundColor:"#18231acc",padding:{x:5,y:2}}).setOrigin(.5);
-      c.add([shadow,wall,roof,door,window1,window2,tag]);
+      const shadow=this.add.ellipse(0,10,60,16,0x253027,.18);
+      c.add(shadow);
+      for(let i=0;i<4;i++){
+        const log=this.add.rectangle(-19+i*13,0-(i%2)*8,34,9,0x765235).setAngle(i%2?8:-5).setStrokeStyle(1,0x4f3928);
+        const end=this.add.circle(-4+i*13,0-(i%2)*8,4,0xb18959).setStrokeStyle(1,0x5b422c);
+        c.add([log,end]);
+      }
+    }
+
+    makeCampfire(x,y){
+      const c=this.add.container(x,y).setDepth(y+50);
+      c.add(this.add.ellipse(0,10,52,18,0x263127,.20));
+      c.add(this.add.rectangle(-8,5,30,6,0x5c412c).setAngle(22));
+      c.add(this.add.rectangle(8,5,30,6,0x5c412c).setAngle(-22));
+      const glow=this.add.circle(0,-3,18,0xe89b42,.16);
+      const flame=this.add.triangle(0,-10,-9,11,0,-14,9,11,0xe99a3f);
+      const core=this.add.triangle(0,-7,-5,7,0,-10,5,7,0xf4d26d);
+      c.add([glow,flame,core]);
+      this.tweens.add({targets:[flame,core,glow],scaleY:{from:.9,to:1.12},scaleX:{from:1,to:.92},duration:430,yoyo:true,repeat:-1});
     }
 
     createPeople(){
@@ -223,23 +365,79 @@
     }
 
     makePerson(data){
+      const isChild=data.age<16;
       const c=this.add.container(data.x,data.y).setDepth(data.y+100);
-      const shadow=this.add.ellipse(0,15,22,8,0x1b261e,.27);
-      const body=this.add.ellipse(0,0,data.age<16?13:17,data.age<16?22:29,ROLE_COLORS[data.role]||0x777777).setStrokeStyle(1,0x344239,.5);
-      const head=this.add.circle(0,-17,data.age<16?6:8,data.sex==="F"?0xd8ab82:0xc99a73).setStrokeStyle(1,0x6a4936,.45);
-      const hair=this.add.arc(0,-20,data.age<16?6:8,180,360,false,data.sex==="F"?0x604834:0x4a392e);
-      const marker=this.add.circle(0,-34,4,0xd7bd70).setVisible(false);
-      const ring=this.add.ellipse(0,14,31,14).setStrokeStyle(2,0xf2d276).setFillStyle(0x000000,0).setVisible(false);
-      const label=this.add.text(0,-48,data.name.split(" ")[0],{fontFamily:"Manrope",fontSize:"11px",fontStyle:"600",color:"#fff7df",backgroundColor:"#17221acc",padding:{x:4,y:2}}).setOrigin(.5).setVisible(false);
-      c.add([shadow,ring,body,head,hair,marker,label]);
-      c.setSize(36,52).setInteractive(new Phaser.Geom.Rectangle(-18,-42,36,58),Phaser.Geom.Rectangle.Contains);
+      const scale=isChild?.78:1;
+      c.setScale(scale);
+
+      const shadow=this.add.ellipse(0,17,26,9,0x1b261e,.28);
+      const ring=this.add.ellipse(0,17,34,15).setStrokeStyle(2,0xf2d276).setFillStyle(0x000000,0).setVisible(false);
+
+      // Legs and arms create a readable walking silhouette.
+      const legL=this.add.rectangle(-5,8,5,16,0x4e4337).setOrigin(.5,0);
+      const legR=this.add.rectangle(5,8,5,16,0x4e4337).setOrigin(.5,0);
+      const body=this.add.rectangle(0,-1,18,28,ROLE_COLORS[data.role]||0x777777).setStrokeStyle(1,0x344239,.65);
+      body.setRoundedRadius?.(5);
+      const belt=this.add.rectangle(0,4,18,4,0x493c30,.8);
+      const accent=this.add.rectangle(0,-8,17,4,ROLE_ACCENTS[data.role]||0xb99d65,.9);
+      const armL=this.add.rectangle(-12,-1,5,20,ROLE_COLORS[data.role]||0x777777).setOrigin(.5,.15);
+      const armR=this.add.rectangle(12,-1,5,20,ROLE_COLORS[data.role]||0x777777).setOrigin(.5,.15);
+
+      const skin=data.sex==="F"?0xd9ac83:0xc99b75;
+      const head=this.add.circle(0,-22,8.5,skin).setStrokeStyle(1,0x694b39,.45);
+      const hairColor=["0x4b3529","0x674a31","0x3c3028"][hash(data.name)%3];
+      const hair=this.add.arc(0,-25,8.5,180,360,false,Number(hairColor));
+      if(data.sex==="F"&&!isChild){
+        c.add(this.add.ellipse(6,-19,6,14,Number(hairColor)).setAngle(18));
+      }
+
+      const marker=this.add.circle(0,-42,4,0xd7bd70).setVisible(false);
+      const label=this.add.text(0,-56,data.name.split(" ")[0],{fontFamily:"Manrope",fontSize:"11px",fontStyle:"700",color:"#fff7df",backgroundColor:"#17221ad9",padding:{x:4,y:2}}).setOrigin(.5).setVisible(false);
+
+      c.add([shadow,ring,legL,legR,armL,armR,body,belt,accent,head,hair]);
+      this.addRoleAccessory(c,data.role,isChild);
+      c.add([marker,label]);
+
+      c.setSize(46,64).setInteractive(new Phaser.Geom.Rectangle(-23,-48,46,68),Phaser.Geom.Rectangle.Contains);
       c.person={...data,health:96-(hash(data.name+"h")%9),energy:70+(hash(data.name+"e")%28),prestige:hash(data.name+"p")%26,followed:false,activity:"En casa",home:{x:data.x,y:data.y}};
-      c.parts={marker,ring,label,body};
+      c.parts={marker,ring,label,body,legL,legR,armL,armR};
       c.on("pointerdown",(pointer)=>{
         pointer.event.stopPropagation?.();
         selectPerson(c);
       });
       return c;
+    }
+
+    addRoleAccessory(c,role,isChild){
+      if(isChild){
+        const scarf=this.add.rectangle(0,-12,18,4,0xd1a86a,.9);
+        c.add(scarf);
+        return;
+      }
+      if(role==="agricultor"){
+        const brim=this.add.rectangle(0,-31,23,4,0xc4a85f);
+        const hat=this.add.ellipse(0,-34,14,8,0xb5944e);
+        c.add([brim,hat]);
+      }else if(role==="leñador"){
+        const handle=this.add.rectangle(17,-2,3,27,0x6a4b31).setAngle(-18);
+        const axe=this.add.rectangle(22,-14,10,7,0x8a8b83).setAngle(-18);
+        c.add([handle,axe]);
+      }else if(role==="constructor"){
+        const handle=this.add.rectangle(17,-2,3,24,0x6c4d31).setAngle(-16);
+        const hammer=this.add.rectangle(20,-13,11,5,0x777875).setAngle(-16);
+        c.add([handle,hammer]);
+      }else if(role==="cazador"){
+        const bow=this.add.arc(17,-3,11,250,110,false).setStrokeStyle(2,0x7a5636);
+        const string=this.add.line(0,0,17,-14,17,9,0xcab994,.8);
+        c.add([bow,string]);
+      }else if(role==="explorador"){
+        const pack=this.add.rectangle(-10,-1,9,20,0x644b36).setStrokeStyle(1,0x3d3127);
+        const cloak=this.add.triangle(-3,5,-10,-9,-3,18,5,-9,0x385c63,.68);
+        c.add([pack,cloak]);
+      }else if(role==="recolector"){
+        const basket=this.add.ellipse(15,7,16,11,0x8a6a43).setStrokeStyle(2,0x60492f);
+        c.add(basket);
+      }
     }
 
     targetFor(person){
@@ -269,14 +467,29 @@
         const t=this.targetFor(person);
         person.person.activity=t.activity;
         const dist=Phaser.Math.Distance.Between(person.x,person.y,t.x,t.y);
-        const speed=person.person.age<16?70:95;
+        const speed=person.person.age<16?72:96;
         const duration=Math.max(700,(dist/speed)*1000);
-        person.parts.body.setScale(1.04,0.96);
+
+        person.walkTween?.stop();
+        person.parts.body.setScale(1.03,.97);
+        person.walkTween=this.tweens.add({
+          targets:[person.parts.legL,person.parts.armR],
+          angle:{from:-13,to:13},duration:190,yoyo:true,repeat:-1
+        });
+        person.walkTween2=this.tweens.add({
+          targets:[person.parts.legR,person.parts.armL],
+          angle:{from:13,to:-13},duration:190,yoyo:true,repeat:-1
+        });
+
         this.tweens.add({
           targets:person,x:t.x,y:t.y,duration,ease:"Sine.easeInOut",
           onUpdate:()=>{person.setDepth(person.y+100)},
           onComplete:()=>{
+            person.walkTween?.stop();person.walkTween2?.stop();
+            person.parts.legL.setAngle(0);person.parts.legR.setAngle(0);
+            person.parts.armL.setAngle(0);person.parts.armR.setAngle(0);
             person.parts.body.setScale(1);
+            this.tweens.add({targets:person.parts.body,scaleY:{from:.97,to:1.03},duration:650,yoyo:true,repeat:1});
             if(selected===person)updatePersonPanel(person);
             this.scheduleNext(person,900+Math.random()*1700);
           }
