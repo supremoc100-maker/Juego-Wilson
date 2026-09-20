@@ -119,6 +119,7 @@
         this.resourceTrees=[];
         this.storyStructures=[];
         this.storyEffects=[];
+        this.projectVisuals=[];
         this.visualStory={
           logsDelivered:0,
           cropsDelivered:0,
@@ -404,47 +405,107 @@
       this.tweens.add({targets:[flame,core,glow],scaleY:{from:.9,to:1.12},scaleX:{from:1,to:.92},duration:430,yoyo:true,repeat:-1});
     }
 
-    syncBuildings(buildingRows){
-      if(!Array.isArray(buildingRows)||!buildingRows.length)return;
+    syncBuildings(buildingRows,buildingInstances=null){
+      const instances=Array.isArray(buildingInstances)&&buildingInstances.length
+        ? buildingInstances
+        : null;
+      if(!instances&&(!Array.isArray(buildingRows)||!buildingRows.length))return;
+
       for(const item of this.villageStructures||[])item?.destroy(true);
       for(const item of this.villageSmoke||[])item?.destroy(true);
       this.villageStructures=[];
       this.villageSmoke=[];
 
-      const layouts={
+      const fallbackLayouts={
         vivienda:[[885,610],[1005,555],[1165,575],[900,765],[1195,825],[1320,760],[1080,525],[1380,690]],
-        almacen:[[1260,680],[1210,610]],
-        granja:[[545,815],[420,805],[640,830]],
-        carpinteria:[[1435,675],[1500,760]],
-        taller:[[1435,675],[1500,760]]
+        almacen:[[1260,680],[1210,610]],granja:[[545,815],[420,805],[640,830]],
+        carpinteria:[[1435,675],[1500,760]],taller:[[1435,675],[1500,760]]
       };
-      const used=Object.create(null);
 
-      for(const row of buildingRows){
-        const type=String(row.type||"vivienda");
-        const count=Math.max(0,Number(row.count||0));
-        for(let i=0;i<count;i++){
-          const key=type==="almacén"?"almacen":type;
-          const list=layouts[key]||layouts.vivienda;
-          const idx=used[key]||0;
-          used[key]=idx+1;
-          const [x,y]=list[idx%list.length];
-          let kind="home",label="Vivienda";
-          if(key==="almacen"){kind="storage";label="Almacén"}
-          else if(key==="granja"){kind="home";label="Granja"}
-          else if(key==="carpinteria"||key==="taller"){kind="workshop";label="Carpintería"}
-          const structure=this.makeHouse(x,y,label,kind,idx%3);
-          this.villageStructures.push(structure);
-          if(key==="granja"){
-            const fence=this.makeFence(x-35,y+55,100,-4);
-            this.villageStructures.push(fence);
-          }
-          if(key==="carpinteria"||key==="taller"){
-            const logs=this.makeLogPile(x+55,y+35);
-            this.villageStructures.push(logs);
-          }
-          if(key!=="granja" && idx%2===0)this.villageSmoke.push(this.makeSmoke(x+30,y-58,.72+(idx%3)*.06));
+      const rows=[];
+      if(instances){
+        for(const item of instances){
+          rows.push({...item,x:Number(item.x),y:Number(item.y)});
         }
+      }else{
+        const used=Object.create(null);
+        for(const row of buildingRows){
+          const type=String(row.type||"vivienda");
+          const key=type==="almacén"?"almacen":type;
+          const count=Math.max(0,Number(row.count||0));
+          for(let i=0;i<count;i++){
+            const idx=used[key]||0;used[key]=idx+1;
+            const list=fallbackLayouts[key]||fallbackLayouts.vivienda;
+            const [x,y]=list[idx%list.length];
+            rows.push({id:`fallback-${key}-${idx}`,type:key,x,y,name:key});
+          }
+        }
+      }
+
+      rows.forEach((row,idx)=>{
+        const key=String(row.type||"vivienda");
+        const x=Number(row.x),y=Number(row.y);
+        if(!Number.isFinite(x)||!Number.isFinite(y))return;
+        let kind="home",label="Vivienda";
+        if(key==="almacen"){kind="storage";label="Almacén"}
+        else if(key==="granja"){kind="home";label="Granja"}
+        else if(key==="carpinteria"||key==="taller"){kind="workshop";label="Carpintería"}
+        const structure=this.makeHouse(x,y,label,kind,idx%3);
+        structure.setData("buildingId",row.id);
+        structure.setData("buildingType",key);
+        this.villageStructures.push(structure);
+        if(key==="granja"){
+          this.villageStructures.push(this.makeFence(x-35,y+55,100,-4));
+        }
+        if(key==="carpinteria"||key==="taller"){
+          this.villageStructures.push(this.makeLogPile(x+55,y+35));
+        }
+        if(key!=="granja" && idx%2===0)this.villageSmoke.push(this.makeSmoke(x+30,y-58,.72+(idx%3)*.06));
+      });
+    }
+
+    makePersistentProject(row){
+      const x=Number(row.x),y=Number(row.y),v=clamp(Number(row.progress||0),0,1);
+      const container=this.add.container(x,y).setDepth(y+25);
+      const shadow=this.add.ellipse(0,24,112,29,0x223025,.22);
+      const earth=this.add.rectangle(0,13,104,52,0x927b58,.52).setStrokeStyle(2,0x685641,.75);
+      const foundation=this.add.rectangle(0,11,84,40,0xb2a27c,.28).setStrokeStyle(3,0x6e6658,.8);
+      const postA=this.add.rectangle(-33,-2,7,58,0x74543a).setOrigin(.5,1);
+      const postB=this.add.rectangle(33,-2,7,58,0x74543a).setOrigin(.5,1);
+      const beam=this.add.rectangle(0,-42,78,7,0x76563b);
+      const roof=this.add.triangle(0,-54,-52,17,0,-30,52,17,0x76513b);
+      const labelMap={vivienda:"VIVIENDA",almacen:"ALMACÉN",granja:"GRANJA",carpinteria:"CARPINTERÍA"};
+      const sign=this.add.text(0,46,`${labelMap[row.type]||"OBRA"} · ${Math.round(v*100)}%`,{
+        fontFamily:"Manrope",fontSize:"10px",fontStyle:"700",color:"#f3e6bf",
+        backgroundColor:"#17221ad5",padding:{x:6,y:3}
+      }).setOrigin(.5);
+      container.add([shadow,earth,foundation,postA,postB,beam,roof,sign]);
+      const view={
+        id:row.id,type:row.type,x,y,container,foundation,postA,postB,beam,roof,sign,
+        progress:v,complete:false,persistent:true
+      };
+      postA.setScale(1,.15+.85*clamp((v-.16)/.30,0,1));
+      postB.setScale(1,.15+.85*clamp((v-.16)/.30,0,1));
+      foundation.setAlpha(.28+.55*Math.min(1,v/.25));
+      beam.setAlpha(clamp((v-.42)/.16,0,1));
+      roof.setAlpha(clamp((v-.68)/.20,0,1));
+      return view;
+    }
+
+    syncProjects(projectRows){
+      for(const view of this.projectVisuals||[])view?.container?.destroy(true);
+      this.projectVisuals=[];
+      if(this.visualStory?.construction?.container&&!this.visualStory.construction.persistent){
+        this.visualStory.construction.container.destroy(true);
+      }
+      this.visualStory.construction=null;
+
+      for(const row of projectRows||[]){
+        const view=this.makePersistentProject(row);
+        this.projectVisuals.push(view);
+      }
+      if(this.projectVisuals.length){
+        this.visualStory.construction=this.projectVisuals[0];
       }
     }
 
@@ -457,6 +518,7 @@
     }
 
     ensureConstructionProject(force=false){
+      if(liveMode)return this.visualStory.construction;
       if(this.visualStory.construction&&!this.visualStory.construction.complete)return;
       const sites=[
         {x:1455,y:730},{x:1515,y:620},{x:1415,y:865},{x:1600,y:725}
@@ -494,6 +556,10 @@
     advanceConstruction(amount=.10,person=null){
       const p=this.visualStory.construction;
       if(!p||p.complete)return;
+      if(liveMode){
+        if(person)showActivity(`${person.person.name} trabaja en ${p.type||"la obra"}; el avance real lo decide la simulación.`);
+        return;
+      }
       p.progress=Math.min(1,p.progress+amount);
       this.updateConstructionVisual();
       if(person)showActivity(`${person.person.name} avanzó la construcción al ${Math.round(p.progress*100)}%.`);
@@ -900,7 +966,8 @@
       renderEventList(snapshot.events||[]);
       renderObjectives(snapshot);
       syncActiveOrders(snapshot.orders||[]);
-      if(Array.isArray(snapshot.buildings))this.syncBuildings(snapshot.buildings);
+      if(Array.isArray(snapshot.buildings))this.syncBuildings(snapshot.buildings,snapshot.building_instances||null);
+      this.syncProjects(snapshot.projects||[]);
 
       if(replacePeople&&Array.isArray(snapshot.people)){
         this.clearPeople();
@@ -1320,7 +1387,7 @@
     btn.setAttribute("aria-pressed",activate?"true":"false");
 
     if(activate&&type==="expand")sceneRef?.activateExpansion();
-    if(activate&&type==="housing")sceneRef?.ensureConstructionProject(true);
+    if(activate&&type==="housing"&&!liveMode)sceneRef?.ensureConstructionProject(true);
 
     const activeLabels=[...activeCommands].map(commandLabel);
     showActivity(activate
