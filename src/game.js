@@ -319,7 +319,23 @@
         dragging=false;
         if(!wasTap)return;
         const world=this.cameras.main.getWorldPoint(p.x,p.y);
-        let nearest=null,best=42;
+        let nearest=null,best=48;
+        for(const person of this.people){
+          const d=Phaser.Math.Distance.Between(world.x,world.y,person.x,person.y);
+          if(d<best){best=d;nearest=person}
+        }
+        if(nearest)selectPerson(nearest);
+      });
+
+      // Fallback táctil directo sobre el canvas. Es más fiable en navegadores móviles
+      // y mantiene la selección correcta aunque la cámara tenga zoom o desplazamiento.
+      const canvas=this.game.canvas;
+      canvas.addEventListener("click",e=>{
+        const rect=canvas.getBoundingClientRect();
+        const px=(e.clientX-rect.left)*(canvas.width/rect.width);
+        const py=(e.clientY-rect.top)*(canvas.height/rect.height);
+        const world=this.cameras.main.getWorldPoint(px,py);
+        let nearest=null,best=58;
         for(const person of this.people){
           const d=Phaser.Math.Distance.Between(world.x,world.y,person.x,person.y);
           if(d<best){best=d;nearest=person}
