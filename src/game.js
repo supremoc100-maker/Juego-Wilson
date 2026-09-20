@@ -105,9 +105,25 @@
 
       // river
       const river=this.add.graphics().setDepth(-18);
-      river.lineStyle(82,0x648d8a,1);
-      river.beginPath();river.moveTo(-40,120);river.bezierCurveTo(420,330,340,710,660,900);river.bezierCurveTo(940,1080,1180,1260,1340,1450);river.strokePath();
-      river.lineStyle(5,0x8fb5ad,.55);river.beginPath();river.moveTo(-40,108);river.bezierCurveTo(420,318,340,700,660,888);river.bezierCurveTo(940,1068,1180,1248,1340,1438);river.strokePath();
+      const cubic=(a,b,c,d,t)=>{
+        const mt=1-t;
+        return mt*mt*mt*a+3*mt*mt*t*b+3*mt*t*t*c+t*t*t*d;
+      };
+      const drawRiverSegment=(p0,p1,p2,p3)=>{
+        for(let i=0;i<=34;i++){
+          const t=i/34;
+          const x=cubic(p0.x,p1.x,p2.x,p3.x,t);
+          const y=cubic(p0.y,p1.y,p2.y,p3.y,t);
+          river.fillStyle(0x648d8a,1).fillCircle(x,y,43);
+          river.fillStyle(0x8fb5ad,.20).fillCircle(x-10,y-8,29);
+        }
+      };
+      drawRiverSegment(
+        {x:-40,y:120},{x:420,y:330},{x:340,y:710},{x:660,y:900}
+      );
+      drawRiverSegment(
+        {x:660,y:900},{x:940,y:1080},{x:1180,y:1260},{x:1340,y:1450}
+      );
 
       // paths
       const p=this.add.graphics().setDepth(-10);
