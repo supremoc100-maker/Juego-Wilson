@@ -457,6 +457,12 @@
         const structure=this.makeHouse(x,y,label,kind,idx%3);
         structure.setData("buildingId",row.id);
         structure.setData("buildingType",key);
+        structure.setData("buildingRow",row);
+        structure.setSize(118,92).setInteractive({useHandCursor:true});
+        structure.on("pointerdown",(pointer,localX,localY,event)=>{
+          event?.stopPropagation?.();
+          this.showBuildingPanel(row);
+        });
         this.villageStructures.push(structure);
         if(key==="granja"){
           this.villageStructures.push(this.makeFence(x-35,y+55,100,-4));
@@ -466,6 +472,63 @@
         }
         if(key!=="granja" && idx%2===0)this.villageSmoke.push(this.makeSmoke(x+30,y-58,.72+(idx%3)*.06));
       });
+    }
+
+    showBuildingPanel(row){
+      if(!row)return;
+      const panel=$("buildingPanel");
+      if(!panel)return;
+      $("personPanel")?.classList.add("hidden");
+      if(selected){
+        selected.parts?.ring?.setVisible(false);
+        selected.parts?.label?.setVisible(false);
+        selected.parts?.marker?.setVisible(!!selected.person.followed);
+        selected=null;
+      }
+
+      const id=Number(row.id);
+      const type=String(row.type||"estructura");
+      const typeLabel=({vivienda:"Vivienda",almacen:"Almacén",granja:"Granja",carpinteria:"Carpintería"})[type]||type;
+      const inventories=(liveSnapshot?.inventories||[]).filter(i=>Number(i.building_id)===id);
+      const households=(liveSnapshot?.households||[]).filter(h=>Number(h.building_id)===id);
+      const residents=households.reduce((s,h)=>s+Number(h.members||0),0);
+      const sourceTasks=(liveSnapshot?.tasks||[]).filter(t=>Number(t.source_building_id)===id);
+      const targetTasks=(liveSnapshot?.tasks||[]).filter(t=>Number(t.target_x)===Number(row.x)&&Number(t.target_y)===Number(row.y));
+      const invText=inventories.length
+        ? inventories.filter(i=>Number(i.quantity||0)>0).map(i=>{
+            const name=i.resource_type==="wood"?"Madera":i.resource_type==="stone"?"Piedra":i.resource_type;
+            return name+" "+Number(i.quantity||0).toFixed(1);
+          }).join(" · ")||"Vacío"
+        : "Sin inventario material";
+
+      $("buildingName").textContent=row.name||typeLabel;
+      $("buildingMeta").textContent=typeLabel+" · posición "+Math.round(Number(row.x||0))+","+Math.round(Number(row.y||0));
+      $("buildingInventory").textContent=invText;
+      $("buildingOccupancy").textContent=type==="vivienda"
+        ? households.length+" hogar(es) · "+residents+" residente(s)"
+        : "No residencial";
+      $("buildingLogistics").textContent=(sourceTasks.length+targetTasks.length)
+        ? sourceTasks.length+" salida(s) · "+targetTasks.length+" llegada(s)"
+        : "Sin tareas activas";
+      const bm=Number(row.built_month||0);
+      $("buildingAge").textContent="Año "+Math.floor(bm/12)+", mes "+((bm%12)+1);
+
+      let detail="";
+      if(type==="vivienda"){
+        detail=households.length
+          ? households.map(h=>h.name+" · "+Number(h.members||0)+" miembro(s)").join(" · ")
+          : "Esta vivienda está libre y puede recibir un hogar cuando la comunidad necesite mudarse.";
+      }else if(type==="carpinteria"){
+        detail="La carpintería concentra madera procesada y funciona como punto preferente de salida para obras.";
+      }else if(type==="almacen"){
+        detail="Este almacén puede guardar materiales y servir como origen físico de viajes logísticos.";
+      }else if(type==="granja"){
+        detail="Infraestructura agrícola permanente. Su producción contribuye a las reservas alimentarias de la comunidad.";
+      }else{
+        detail="Estructura persistente del asentamiento.";
+      }
+      $("buildingDetail").textContent=detail;
+      panel.classList.remove("hidden");
     }
 
     makePersistentProject(row){
@@ -1365,6 +1428,7 @@
   }
 
   function selectPerson(person){
+    $("buildingPanel")?.classList.add("hidden");
     if(selected){
       selected.parts.ring.setVisible(false);
       selected.parts.label.setVisible(false);
@@ -1529,6 +1593,7 @@
       showActivity("Mostrando los acontecimientos recientes de la comunidad.");
     }
   }));
+  $("closeBuilding")?.addEventListener("click",()=>$("buildingPanel")?.classList.add("hidden"));
   $("closePerson").addEventListener("click",()=>{
     $("personPanel").classList.add("hidden");
     if(selected){selected.parts.ring.setVisible(false);selected.parts.label.setVisible(false);selected.parts.marker.setVisible(selected.person.followed)}
