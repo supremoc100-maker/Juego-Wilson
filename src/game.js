@@ -273,15 +273,29 @@
         cam.setZoom(clamp(cam.zoom-dy*0.0006,.48,1.45));
       });
 
-      let dragging=false,lastX=0,lastY=0;
-      this.input.on("pointerdown",p=>{if(!p.leftButtonDown())return;dragging=true;lastX=p.x;lastY=p.y});
+      let dragging=false,lastX=0,lastY=0,downX=0,downY=0;
+      this.input.on("pointerdown",p=>{
+        if(!p.leftButtonDown())return;
+        dragging=true;lastX=p.x;lastY=p.y;downX=p.x;downY=p.y;
+      });
       this.input.on("pointermove",p=>{
         if(!dragging||!p.isDown)return;
         const cam=this.cameras.main;
         cam.scrollX-=(p.x-lastX)/cam.zoom;cam.scrollY-=(p.y-lastY)/cam.zoom;
         lastX=p.x;lastY=p.y;
       });
-      this.input.on("pointerup",()=>dragging=false);
+      this.input.on("pointerup",p=>{
+        const wasTap=Phaser.Math.Distance.Between(downX,downY,p.x,p.y)<9;
+        dragging=false;
+        if(!wasTap)return;
+        const world=this.cameras.main.getWorldPoint(p.x,p.y);
+        let nearest=null,best=42;
+        for(const person of this.people){
+          const d=Phaser.Math.Distance.Between(world.x,world.y,person.x,person.y);
+          if(d<best){best=d;nearest=person}
+        }
+        if(nearest)selectPerson(nearest);
+      });
     }
 
     emitVillageEvent(){
