@@ -491,12 +491,13 @@
       const typeLabel=({vivienda:"Vivienda",almacen:"Almacén",granja:"Granja",carpinteria:"Carpintería"})[type]||type;
       const inventories=(liveSnapshot?.inventories||[]).filter(i=>Number(i.building_id)===id);
       const households=(liveSnapshot?.households||[]).filter(h=>Number(h.building_id)===id);
+      const servedHouseholds=(liveSnapshot?.households||[]).filter(h=>Number(h.food_source_building_id)===id);
       const residents=households.reduce((s,h)=>s+Number(h.members||0),0);
       const sourceTasks=(liveSnapshot?.tasks||[]).filter(t=>Number(t.source_building_id)===id);
-      const targetTasks=(liveSnapshot?.tasks||[]).filter(t=>Number(t.target_x)===Number(row.x)&&Number(t.target_y)===Number(row.y));
+      const targetTasks=(liveSnapshot?.tasks||[]).filter(t=>Number(t.target_building_id)===id||(Number(t.target_x)===Number(row.x)&&Number(t.target_y)===Number(row.y)));
       const invText=inventories.length
         ? inventories.filter(i=>Number(i.quantity||0)>0).map(i=>{
-            const name=i.resource_type==="wood"?"Madera":i.resource_type==="stone"?"Piedra":i.resource_type;
+            const name=i.resource_type==="wood"?"Madera":i.resource_type==="stone"?"Piedra":i.resource_type==="food"?"Comida":i.resource_type;
             return name+" "+Number(i.quantity||0).toFixed(1);
           }).join(" · ")||"Vacío"
         : "Sin inventario material";
@@ -506,7 +507,9 @@
       $("buildingInventory").textContent=invText;
       $("buildingOccupancy").textContent=type==="vivienda"
         ? households.length+" hogar(es) · "+residents+" residente(s)"
-        : "No residencial";
+        : type==="almacen"
+          ? servedHouseholds.length+" hogar(es) abastecidos"
+          : "No residencial";
       $("buildingLogistics").textContent=(sourceTasks.length+targetTasks.length)
         ? sourceTasks.length+" salida(s) · "+targetTasks.length+" llegada(s)"
         : "Sin tareas activas";
@@ -516,14 +519,16 @@
       let detail="";
       if(type==="vivienda"){
         detail=households.length
-          ? households.map(h=>h.name+" · "+Number(h.members||0)+" miembro(s)").join(" · ")
+          ? households.map(h=>h.name+" · "+Number(h.members||0)+" miembro(s) · granero: "+(h.food_source_name||"por asignar")).join(" · ")
           : "Esta vivienda está libre y puede recibir un hogar cuando la comunidad necesite mudarse.";
       }else if(type==="carpinteria"){
         detail="La carpintería concentra madera procesada y funciona como punto preferente de salida para obras.";
       }else if(type==="almacen"){
-        detail="Este almacén puede guardar materiales y servir como origen físico de viajes logísticos.";
+        detail=servedHouseholds.length
+          ? "Granero de referencia para "+servedHouseholds.map(h=>h.name).join(", ")+". También puede guardar materiales y recibir viajes logísticos."
+          : "Este almacén guarda reservas físicas y puede convertirse en granero de referencia para los hogares cercanos.";
       }else if(type==="granja"){
-        detail="Infraestructura agrícola permanente. Su producción contribuye a las reservas alimentarias de la comunidad.";
+        detail="La cosecha se acumula aquí primero. Los agricultores deben transportarla físicamente a un granero antes de que los hogares puedan consumirla.";
       }else{
         detail="Estructura persistente del asentamiento.";
       }
@@ -853,6 +858,14 @@
       if(!on)return;
       if(type==="wood"){
         person.carryVisual=this.add.rectangle(0,-34,28,7,0x765136).setStrokeStyle(1,0x4d3828);
+      }else if(type==="food"){
+        const basket=this.add.container(0,-34);
+        basket.add(this.add.ellipse(0,3,22,10,0x8b6339).setStrokeStyle(1,0x513b29));
+        basket.add(this.add.arc(0,-2,16,180,360,false,0xb88b55).setStrokeStyle(2,0xd2b27c));
+        basket.add(this.add.circle(-5,-1,3,0xc9a54c));
+        basket.add(this.add.circle(2,-3,3,0x8aa35d));
+        basket.add(this.add.circle(7,0,3,0xd3b661));
+        person.carryVisual=basket;
       }else{
         person.carryVisual=this.add.circle(0,-33,8,0xb29a56).setStrokeStyle(1,0x6c5c37);
       }
@@ -921,6 +934,22 @@
             x:Number(liveTask.source_x??1260),
             y:Number(liveTask.source_y??680)
           };
+          if(liveTask.task_type==="food_transport"){
+            const sourceName=liveTask.source_building_name||"la granja";
+            const targetName=liveTask.target_building_name||"el granero";
+            this.movePersonTo(person,source,"Recogiendo cosecha en "+sourceName,()=>{
+              this.performWork(person,"Cargando alimentos",650,()=>{
+                this.setCarry(person,"food",true);
+                this.movePersonTo(person,target,"Transportando cosecha a "+targetName,()=>{
+                  this.setCarry(person,"food",false);
+                  this.performWork(person,"Entregando "+Number(liveTask.amount||0).toFixed(1)+" de comida",800,()=>{
+                    this.movePersonTo(person,home,"Regresando después de la entrega",rest);
+                  });
+                });
+              });
+            });
+            return;
+          }
           if(liveTask.task_type==="transport"){
             const resource=liveTask.resource_type==="wood"?"wood":"stone";
             const label=resource==="wood"?"madera":"piedra";
@@ -1454,9 +1483,11 @@
     $("personMeta").textContent=`${p.age} años · ${p.role} · ${p.sex==="F"?"mujer":"hombre"}${household?` · ${household.name}`:""}`;
     const task=(liveSnapshot?.tasks||[]).find(t=>Number(t.person_id)===Number(p.id));
     const taskText=task
-      ? (task.task_type==="transport"
-          ? "Tarea: transportar "+Number(task.amount||0).toFixed(1)+" de "+(task.resource_type==="wood"?"madera":"piedra")+" a "+(task.project_name||"una obra")
-          : "Tarea: construir en "+(task.project_name||"una obra"))
+      ? (task.task_type==="food_transport"
+          ? "Tarea: llevar "+Number(task.amount||0).toFixed(1)+" de comida desde "+(task.source_building_name||"una granja")+" hasta "+(task.target_building_name||"un granero")
+          : task.task_type==="transport"
+            ? "Tarea: transportar "+Number(task.amount||0).toFixed(1)+" de "+(task.resource_type==="wood"?"madera":"piedra")+" a "+(task.project_name||"una obra")
+            : "Tarea: construir en "+(task.project_name||"una obra"))
       : p.activity;
     $("personActivity").textContent=taskText;
     $("personHealth").textContent=`${p.health}%`;
@@ -1577,7 +1608,10 @@
       }
     }else if(view==="resources"){
       const s=liveSnapshot?.settlement;
-      showActivity(s?`Reservas: ${Math.round(Number(s.food||0))} comida · ${Math.round(Number(s.wood||0))} madera · ${Math.round(Number(s.stone||0))} piedra.`:"Los recursos aparecerán al conectar la simulación persistente.");
+      const inv=liveSnapshot?.inventories||[];
+      const storedFood=inv.filter(i=>i.resource_type==="food").reduce((sum,i)=>sum+Number(i.quantity||0),0);
+      const transitFood=(liveSnapshot?.tasks||[]).filter(t=>t.task_type==="food_transport").reduce((sum,t)=>sum+Number(t.amount||0),0);
+      showActivity(s?`Reservas: ${Math.round(Number(s.food||0))} comida (${Math.round(storedFood)} almacenada · ${Math.round(transitFood)} en tránsito) · ${Math.round(Number(s.wood||0))} madera · ${Math.round(Number(s.stone||0))} piedra.`:"Los recursos aparecerán al conectar la simulación persistente.");
     }else if(view==="explore"){
       sceneRef.cameras.main.pan(ZONES.explore.x,ZONES.explore.y,500,"Sine.easeInOut");
       showActivity("La cámara se desplaza hacia la frontera de exploración.");
