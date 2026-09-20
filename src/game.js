@@ -118,6 +118,8 @@
         this.physics.world.setBounds(0,0,WORLD_W,WORLD_H);
         this.resourceTrees=[];
         this.resourceRocks=[];
+        this.resourceNodeVisuals=new Map();
+        this.persistentResourceVisuals=[];
         this.storyStructures=[];
         this.storyEffects=[];
         this.projectVisuals=[];
