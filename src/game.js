@@ -65,6 +65,7 @@
 
     create(){
       sceneRef=this;
+      window.__wilsonScene=this;
       this.cameras.main.setBounds(0,0,WORLD_W,WORLD_H);
       this.physics.world.setBounds(0,0,WORLD_W,WORLD_H);
       this.drawWorld();
