@@ -1370,7 +1370,8 @@
       syncActiveOrders(snapshot.orders||[]);
       if(Array.isArray(snapshot.buildings))this.syncBuildings(snapshot.buildings,snapshot.building_instances||null);
       this.syncProjects(snapshot.projects||[]);
-      this.syncResourceDepletion(snapshot.regions||[]);
+      const exactResources=this.syncResourceNodes(snapshot.resource_nodes||[]);
+      if(!exactResources)this.syncResourceDepletion(snapshot.regions||[]);
       this.syncExpansionHistory(snapshot.expansion_history||[]);
       this.syncExpansion(snapshot.expansion||null);
 
