@@ -30,15 +30,29 @@
     agricultor:"Agricultura",cazador:"Caza",explorador:"Exploración",constructor:"Construcción",
     leñador:"Madera",recolector:"Recolección","niño":"Aprendizaje"
   };
-  const ROLE_SPRITES = {
-    agricultor:"medievalUnit_11.png",
-    leñador:"medievalUnit_03.png",
-    constructor:"medievalUnit_02.png",
-    cazador:"medievalUnit_07.png",
-    explorador:"medievalUnit_01.png",
-    recolector:"medievalUnit_08.png",
-    "niño":"medievalUnit_12.png"
+  const CHARACTER_ASSETS = {
+    "agricultor_M":"./assets/characters/agricultor_M.svg",
+    "agricultor_F":"./assets/characters/agricultor_F.svg",
+    "leñador_M":"./assets/characters/le%C3%B1ador_M.svg",
+    "leñador_F":"./assets/characters/le%C3%B1ador_F.svg",
+    "constructor_M":"./assets/characters/constructor_M.svg",
+    "constructor_F":"./assets/characters/constructor_F.svg",
+    "cazador_M":"./assets/characters/cazador_M.svg",
+    "cazador_F":"./assets/characters/cazador_F.svg",
+    "explorador_M":"./assets/characters/explorador_M.svg",
+    "explorador_F":"./assets/characters/explorador_F.svg",
+    "recolector_M":"./assets/characters/recolector_M.svg",
+    "recolector_F":"./assets/characters/recolector_F.svg",
+    "niño_M":"./assets/characters/nino_M.svg",
+    "niño_F":"./assets/characters/nino_F.svg"
   };
+  function characterKey(role,sex,age){
+    const base=age<16?"niño":(CHARACTER_ASSETS[`${role}_${sex}`]?role:"recolector");
+    return `${base}_${sex==="F"?"F":"M"}`;
+  }
+  function characterUrl(role,sex,age){
+    return CHARACTER_ASSETS[characterKey(role,sex,age)]||CHARACTER_ASSETS.recolector_M;
+  }
   const HOUSE_SPRITES = {
     home:["medievalStructure_09.png","medievalStructure_11.png","medievalStructure_17.png","medievalStructure_18.png","medievalStructure_19.png"],
     storage:["medievalStructure_21.png","medievalStructure_20.png"],
@@ -90,6 +104,9 @@
         "./assets/kenney/medievalRTS_spritesheet@2.png",
         "./assets/kenney/medievalRTS_spritesheet@2.xml"
       );
+      for(const [key,url] of Object.entries(CHARACTER_ASSETS)){
+        this.load.svg("wilson_"+key,url);
+      }
     }
 
     create(){
@@ -544,23 +561,23 @@
       const ring=this.add.ellipse(0,15,isChild?28:38,isChild?12:16)
         .setStrokeStyle(2,0xf2d276).setFillStyle(0x000000,0).setVisible(false);
 
-      const frame=ROLE_SPRITES[data.role]||ROLE_SPRITES.recolector;
-      const sprite=this.add.image(0,0,"kenney",frame).setOrigin(.5,.76);
-      const baseScale=isChild?.92:1.38;
+      const charKey=characterKey(data.role,data.sex,data.age);
+      const sprite=this.add.image(0,0,"wilson_"+charKey).setOrigin(.5,.88);
+      const baseScale=isChild?.50:.56;
       sprite.setScale(baseScale);
 
-      // Profession badge: tiny and readable at mobile zoom.
+      // Subtle role accent. The clothing itself now carries the profession identity.
       const badgeColor=ROLE_COLORS[data.role]||0x777777;
-      const badge=this.add.circle(12,-21,isChild?3:4,badgeColor).setStrokeStyle(1,0xf2e6c8,.75);
+      const badge=this.add.circle(17,-27,isChild?3:3.5,badgeColor,.92).setStrokeStyle(1,0xf2e6c8,.65);
 
-      const marker=this.add.circle(0,-39,4,0xd7bd70).setVisible(false);
-      const label=this.add.text(0,-53,data.name.split(" ")[0],{
+      const marker=this.add.circle(0,-48,4,0xd7bd70).setVisible(false);
+      const label=this.add.text(0,-62,data.name.split(" ")[0],{
         fontFamily:"Manrope",fontSize:"11px",fontStyle:"700",color:"#fff7df",
         backgroundColor:"#17221ad9",padding:{x:4,y:2}
       }).setOrigin(.5).setVisible(false);
 
       c.add([shadow,ring,sprite,badge,marker,label]);
-      c.setSize(48,64).setInteractive(new Phaser.Geom.Rectangle(-24,-48,48,68),Phaser.Geom.Rectangle.Contains);
+      c.setSize(54,76).setInteractive(new Phaser.Geom.Rectangle(-27,-58,54,82),Phaser.Geom.Rectangle.Contains);
       c.person={
         ...data,
         health:data.health??(96-(hash(data.name+"h")%9)),
@@ -571,6 +588,8 @@
         perception:data.perception??(35+hash(data.name+"q")%61),
         followed:data.followed??false,
         activity:"En casa",
+        visualKey:characterKey(data.role,data.sex,data.age),
+        visualUrl:characterUrl(data.role,data.sex,data.age),
         home:{x:data.x,y:data.y}
       };
       c.parts={marker,ring,label,sprite,badge,baseScale};
@@ -776,6 +795,11 @@
   function updatePersonPanel(person){
     const p=person.person;
     $("personPanel").classList.remove("hidden");
+    const portrait=$("personPortrait");
+    if(portrait){
+      portrait.src=p.visualUrl||characterUrl(p.role,p.sex,p.age);
+      portrait.alt=`Retrato de ${p.name}`;
+    }
     $("personName").textContent=p.name;
     $("personMeta").textContent=`${p.age} años · ${p.role} · ${p.sex==="F"?"mujer":"hombre"}`;
     $("personActivity").textContent=p.activity;
