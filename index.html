@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#111b15" />
+  <title>Wilson — Aldea viva</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="game-header">
+      <div>
+        <span class="kicker">WILSON · DEMO VISUAL</span>
+        <h1>Primer Asentamiento</h1>
+        <div id="worldDate" class="world-date">Año 0 · Primavera · Día 1 · 07:00</div>
+      </div>
+      <div class="header-stats">
+        <div><span>Población</span><strong id="populationStat">25</strong></div>
+        <div><span>Comida</span><strong id="foodStat">220</strong></div>
+        <div><span>Ánimo</span><strong id="moodStat">78%</strong></div>
+      </div>
+    </header>
+
+    <section class="game-stage">
+      <div id="game"></div>
+
+      <div class="top-hud" aria-label="Controles del juego">
+        <div class="speed-controls">
+          <button type="button" class="hud-btn" data-speed="0" aria-label="Pausar">Ⅱ</button>
+          <button type="button" class="hud-btn active" data-speed="1">×1</button>
+          <button type="button" class="hud-btn" data-speed="3">×3</button>
+          <button type="button" class="hud-btn" data-speed="8">×8</button>
+        </div>
+        <div class="camera-controls">
+          <button type="button" class="hud-btn" id="zoomOut" aria-label="Alejar">−</button>
+          <button type="button" class="hud-btn" id="centerCamera" aria-label="Centrar cámara">◎</button>
+          <button type="button" class="hud-btn" id="zoomIn" aria-label="Acercar">＋</button>
+        </div>
+      </div>
+
+      <div id="activityToast" class="activity-toast">
+        <span class="pulse"></span>
+        <strong>La aldea está despertando.</strong>
+      </div>
+
+      <aside id="personPanel" class="person-panel hidden" aria-live="polite">
+        <button type="button" id="closePerson" class="close-panel" aria-label="Cerrar">×</button>
+        <span class="kicker">HABITANTE</span>
+        <h2 id="personName">—</h2>
+        <p id="personMeta">—</p>
+        <div class="person-grid">
+          <div><span>Actividad</span><strong id="personActivity">—</strong></div>
+          <div><span>Salud</span><strong id="personHealth">—</strong></div>
+          <div><span>Energía</span><strong id="personEnergy">—</strong></div>
+          <div><span>Prestigio</span><strong id="personPrestige">—</strong></div>
+        </div>
+        <div class="skill-row" id="personSkills"></div>
+        <button type="button" id="followPerson" class="follow-button">☆ Seguir esta vida</button>
+      </aside>
+    </section>
+
+    <section class="command-bar">
+      <div class="command-copy">
+        <span class="kicker">TU INFLUENCIA</span>
+        <strong>Orden estratégica</strong>
+        <small>La población decide cómo cumplirla.</small>
+      </div>
+      <div class="commands">
+        <button type="button" data-command="food"><span>🌾</span>Alimentos</button>
+        <button type="button" data-command="housing"><span>⌂</span>Viviendas</button>
+        <button type="button" data-command="explore"><span>⌖</span>Explorar</button>
+        <button type="button" data-command="storage"><span>▣</span>Reservas</button>
+        <button type="button" data-command="expand"><span>↗</span>Expandir</button>
+      </div>
+    </section>
+
+    <section class="event-strip">
+      <div>
+        <span class="kicker">CRÓNICA EN VIVO</span>
+        <strong id="eventTitle">Fundación del asentamiento</strong>
+      </div>
+      <p id="eventText">Veinticinco personas comienzan a organizar su primera comunidad.</p>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+  <script src="./src/game.js"></script>
+</body>
+</html>
