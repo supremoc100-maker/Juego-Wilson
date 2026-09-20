@@ -66,6 +66,9 @@
   let seasonIndex = 0;
   let food = 220;
   let mood = 78;
+  let liveSnapshot = null;
+  let liveWorldLabel = null;
+  let liveMode = false;
 
   const seasons = ["Primavera","Verano","Otoño","Invierno"];
   const $ = id => document.getElementById(id);
@@ -111,6 +114,7 @@
         this.time.addEvent({delay:5200,loop:true,callback:()=>this.emitVillageEvent()});
         this.time.addEvent({delay:9000,loop:true,callback:()=>this.rebalanceTasks()});
         window.__wilsonStage="ready";
+        this.loadLiveState();
       }catch(e){
         window.__wilsonError={message:e?.message||String(e),stack:e?.stack||""};
         window.__wilsonStage="error";
@@ -355,16 +359,109 @@
       this.tweens.add({targets:[flame,core,glow],scaleY:{from:.9,to:1.12},scaleX:{from:1,to:.92},duration:430,yoyo:true,repeat:-1});
     }
 
-    createPeople(){
+    createPeople(source=PEOPLE){
       this.people=[];
-      PEOPLE.forEach((raw,i)=>{
-        const [name,sex,age,role]=raw;
-        const h=hash(name);
+      source.forEach((raw,i)=>{
+        let data;
+        if(Array.isArray(raw)){
+          const [name,sex,age,role]=raw;
+          data={id:i+1,name,sex,age,role,live:false};
+        }else{
+          data={
+            id:raw.id,
+            name:raw.name,
+            sex:raw.sex,
+            age:Math.max(0,Math.floor(Number(raw.age_months||0)/12)),
+            role:raw.profession||"recolector",
+            live:true,
+            health:Number(raw.health??100),
+            energy:Number(raw.energy??100),
+            hunger:Number(raw.hunger??0),
+            prestige:Number(raw.prestige??0),
+            discipline:Number(raw.discipline??50),
+            curiosity:Number(raw.curiosity??50),
+            perception:Number(raw.perception??50),
+            strength:Number(raw.strength??50),
+            intelligence:Number(raw.intelligence??50),
+            charisma:Number(raw.charisma??50),
+            courage:Number(raw.courage??50),
+            sociability:Number(raw.sociability??50),
+            ambition:Number(raw.ambition??50),
+            followed:!!raw.followed,
+            partner_id:raw.partner_id??null,
+            father_id:raw.father_id??null,
+            mother_id:raw.mother_id??null,
+            agriculture:Number(raw.agriculture??0),
+            hunting:Number(raw.hunting??0),
+            building:Number(raw.building??0),
+            gathering:Number(raw.gathering??0),
+            exploration:Number(raw.exploration??0)
+          };
+        }
+        const h=hash(data.name+"-"+data.id);
         const x=920+(h%320), y=610+((h>>>8)%250);
-        const person=this.makePerson({id:i+1,name,sex,age,role,x,y});
+        const person=this.makePerson({...data,x,y});
         this.people.push(person);
-        this.scheduleNext(person,500+i*90);
+        this.scheduleNext(person,500+i*70);
       });
+      $("populationStat").textContent=this.people.length;
+    }
+
+    clearPeople(){
+      for(const person of this.people||[]){
+        this.tweens.killTweensOf(person);
+        if(person.parts?.sprite)this.tweens.killTweensOf(person.parts.sprite);
+        person.destroy(true);
+      }
+      this.people=[];
+      if(selected){
+        $("personPanel").classList.add("hidden");
+        selected=null;
+      }
+    }
+
+    async loadLiveState(){
+      try{
+        const response=await fetch("/api/state",{credentials:"same-origin",headers:{"Accept":"application/json"}});
+        if(!response.ok)throw new Error("state "+response.status);
+        const snapshot=await response.json();
+        this.applySnapshot(snapshot,true);
+        liveMode=true;
+        window.__wilsonLive=true;
+        showActivity("Simulación persistente conectada. La aldea refleja el estado real del mundo.");
+      }catch(err){
+        liveMode=false;
+        window.__wilsonLive=false;
+        window.__wilsonLiveError=String(err?.message||err);
+        const mode=$("dataMode");
+        if(mode)mode.textContent="Demo visual";
+      }
+    }
+
+    applySnapshot(snapshot,replacePeople=false){
+      if(!snapshot?.world||!snapshot?.settlement)return;
+      liveSnapshot=snapshot;
+      liveWorldLabel=snapshot.world.label||null;
+      food=Math.round(Number(snapshot.settlement.food||0));
+      mood=Math.round(Number(snapshot.summary?.average_health||100));
+
+      const settlementName=$("settlementName");
+      if(settlementName)settlementName.textContent=snapshot.settlement.name||"Primer Asentamiento";
+      $("populationStat").textContent=String(snapshot.summary?.population??snapshot.people?.length??0);
+      $("foodStat").textContent=String(Math.round(Number(snapshot.settlement.food||0)));
+      const wood=$("woodStat"); if(wood)wood.textContent=String(Math.round(Number(snapshot.settlement.wood||0)));
+      const stone=$("stoneStat"); if(stone)stone.textContent=String(Math.round(Number(snapshot.settlement.stone||0)));
+      const health=$("healthStat"); if(health)health.textContent=`${Math.round(Number(snapshot.summary?.average_health||100))}%`;
+      const mode=$("dataMode"); if(mode)mode.textContent="Simulación persistente";
+
+      const latest=snapshot.events?.[0];
+      if(latest)updateEvent(latest.title,latest.description);
+
+      if(replacePeople&&Array.isArray(snapshot.people)){
+        this.clearPeople();
+        this.createPeople(snapshot.people.filter(p=>p.alive!==false));
+      }
+      updateClock();
     }
 
     makePerson(data){
@@ -392,7 +489,18 @@
 
       c.add([shadow,ring,sprite,badge,marker,label]);
       c.setSize(48,64).setInteractive(new Phaser.Geom.Rectangle(-24,-48,48,68),Phaser.Geom.Rectangle.Contains);
-      c.person={...data,health:96-(hash(data.name+"h")%9),energy:70+(hash(data.name+"e")%28),prestige:hash(data.name+"p")%26,followed:false,activity:"En casa",home:{x:data.x,y:data.y}};
+      c.person={
+        ...data,
+        health:data.health??(96-(hash(data.name+"h")%9)),
+        energy:data.energy??(70+(hash(data.name+"e")%28)),
+        prestige:data.prestige??(hash(data.name+"p")%26),
+        discipline:data.discipline??(35+hash(data.name+"d")%61),
+        curiosity:data.curiosity??(35+hash(data.name+"c")%61),
+        perception:data.perception??(35+hash(data.name+"q")%61),
+        followed:data.followed??false,
+        activity:"En casa",
+        home:{x:data.x,y:data.y}
+      };
       c.parts={marker,ring,label,sprite,badge,baseScale};
       c.on("pointerdown",(pointer)=>{
         pointer.event.stopPropagation?.();
@@ -577,17 +685,19 @@
     $("personEnergy").textContent=`${Math.round(p.energy)}%`;
     $("personPrestige").textContent=p.prestige;
     $("personSkills").innerHTML=[
-      ["Disciplina",35+hash(p.name+"d")%61],["Curiosidad",35+hash(p.name+"c")%61],
-      ["Percepción",35+hash(p.name+"q")%61]
+      ["Disciplina",Math.round(p.discipline??50)],
+      ["Curiosidad",Math.round(p.curiosity??50)],
+      ["Percepción",Math.round(p.perception??50)]
     ].map(([k,v])=>`<span>${k} ${v}</span>`).join("");
     $("followPerson").textContent=p.followed?"★ Siguiendo esta vida":"☆ Seguir esta vida";
   }
 
   function updateClock(){
     const h=Math.floor(dayMinutes/60),m=Math.floor(dayMinutes%60);
-    $("worldDate").textContent=`Año ${year} · ${seasons[seasonIndex]} · Día ${day} · ${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+    const time=`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+    $("worldDate").textContent=liveWorldLabel?`${liveWorldLabel} · ${time}`:`Año ${year} · ${seasons[seasonIndex]} · Día ${day} · ${time}`;
     $("foodStat").textContent=food;
-    $("moodStat").textContent=`${mood}%`;
+    const health=$("healthStat"); if(health)health.textContent=`${mood}%`;
   }
 
   function commandLabel(c){
@@ -617,17 +727,51 @@
     if(selected){selected.parts.ring.setVisible(false);selected.parts.label.setVisible(false);selected.parts.marker.setVisible(selected.person.followed)}
     selected=null;
   });
-  $("followPerson").addEventListener("click",()=>{
+  $("followPerson").addEventListener("click",async()=>{
     if(!selected)return;
-    selected.person.followed=!selected.person.followed;
+    if(selected.person.live){
+      try{
+        const response=await fetch("/api/follow",{
+          method:"POST",credentials:"same-origin",
+          headers:{"Content-Type":"application/json","Accept":"application/json"},
+          body:JSON.stringify({person_id:selected.person.id})
+        });
+        if(!response.ok)throw new Error("follow "+response.status);
+        const snapshot=await response.json();
+        liveSnapshot=snapshot;
+        const updated=snapshot.people?.find(p=>p.id===selected.person.id);
+        selected.person.followed=updated?!!updated.followed:!selected.person.followed;
+      }catch(err){
+        showActivity("No se pudo guardar el seguimiento. Verifica que estés conectado como propietario.");
+        return;
+      }
+    }else{
+      selected.person.followed=!selected.person.followed;
+    }
     selected.parts.marker.setVisible(selected.person.followed||selected===selected);
     updatePersonPanel(selected);
     showActivity(selected.person.followed?`Ahora sigues la vida de ${selected.person.name}.`:`Dejaste de seguir a ${selected.person.name}.`);
   });
-  document.querySelectorAll("[data-command]").forEach(btn=>btn.addEventListener("click",()=>{
+  document.querySelectorAll("[data-command]").forEach(btn=>btn.addEventListener("click",async()=>{
     command=btn.dataset.command;
     document.querySelectorAll("[data-command]").forEach(b=>b.classList.toggle("active",b===btn));
     showActivity(`Orden enviada: priorizar ${commandLabel(command)}. La población decidirá cómo responder.`);
     updateEvent("Nueva orden estratégica",`La comunidad recibió la instrucción de priorizar ${commandLabel(command)} durante los próximos ciclos.`);
+
+    if(liveMode){
+      try{
+        const response=await fetch("/api/order",{
+          method:"POST",credentials:"same-origin",
+          headers:{"Content-Type":"application/json","Accept":"application/json"},
+          body:JSON.stringify({type:command,weight:35})
+        });
+        if(!response.ok)throw new Error("order "+response.status);
+        const snapshot=await response.json();
+        sceneRef?.applySnapshot(snapshot,false);
+        showActivity(`Orden persistida: priorizar ${commandLabel(command)}.`);
+      }catch(err){
+        showActivity("La orden visual se aplicó, pero no pudo persistirse. Verifica tu sesión de Hatchable.");
+      }
+    }
   }));
 })();
