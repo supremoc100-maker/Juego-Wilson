@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#111b15" />
+  <meta name="theme-color" content="#111b15" />\n  <link rel="manifest" href="./manifest.webmanifest" />
   <title>Wilson — Civilizaciones vivas</title>
-  <link rel="stylesheet" href="./styles.css?v=17" />
+  <link rel="stylesheet" href="./styles.css?v=18" />
 </head>
 <body>
   <main class="app-shell">
@@ -116,7 +116,12 @@
     </section>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
-  <script src="./src/game.js?v=17"></script>
+  <script src="./vendor/phaser-3.90.0.min.js"></script>
+  <script src="./src/game.js?v=18"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));
+    }
+  </script>
 </body>
 </html>
