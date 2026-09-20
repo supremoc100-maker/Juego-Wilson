@@ -281,6 +281,68 @@
       return rock;
     }
 
+    syncResourceNodes(rows){
+      const list=Array.isArray(rows)?rows:[];
+      if(!list.length)return false;
+
+      for(const node of this.resourceTrees||[]){
+        if(node.zone==="forest")node.container.setVisible(false);
+      }
+      for(const node of this.resourceRocks||[])node.rock.setVisible(false);
+      for(const visual of this.persistentResourceVisuals||[])visual?.destroy?.(true);
+      this.persistentResourceVisuals=[];
+      this.resourceNodeVisuals=new Map();
+
+      for(const row of list){
+        const x=Number(row.world_x),y=Number(row.world_y);
+        const capacity=Math.max(.001,Number(row.capacity||0));
+        const remaining=Math.max(0,Number(row.remaining||0));
+        const ratio=clamp(remaining/capacity,0,1);
+        const depleted=row.status==="depleted"||remaining<=.001;
+        const id=Number(row.id);
+        if(!Number.isFinite(x)||!Number.isFinite(y))continue;
+
+        if(row.node_type==="tree"){
+          const h=hash("persistent-tree-"+id);
+          const frame=["medievalEnvironment_01.png","medievalEnvironment_02.png","medievalEnvironment_03.png","medievalEnvironment_04.png"][h%4];
+          const container=this.add.container(x,y).setDepth(y);
+          const baseScale=.86+((h>>>8)%24)/100;
+          const scale=depleted?.36:baseScale*(.62+.38*ratio);
+          const shadow=this.add.ellipse(4,16,32,12,0x223025,.22*(depleted?.5:1));
+          const tree=this.add.image(0,0,"kenney",frame).setOrigin(.5,.78).setScale(scale);
+          tree.setAlpha(depleted?.16:1);
+          container.add([shadow,tree]);
+          if(depleted){tree.setTint(0x77705e);container.setAlpha(.45)}
+          container.setSize(42,62).setInteractive({useHandCursor:true});
+          container.on("pointerdown",(pointer)=>{
+            pointer.event?.stopPropagation?.();
+            showActivity(depleted
+              ? "Árbol #"+id+" agotado."
+              : "Árbol #"+id+" · "+remaining.toFixed(1)+" / "+capacity.toFixed(1)+" de madera restante · región ("+row.region_x+", "+row.region_y+").");
+          });
+          const visual={id,nodeType:"tree",x,y,container,tree,shadow,row,harvested:depleted};
+          this.resourceNodeVisuals.set(id,visual);
+          this.persistentResourceVisuals.push(container);
+        }else if(row.node_type==="rock"){
+          const h=hash("persistent-rock-"+id);
+          const frame=["medievalEnvironment_07.png","medievalEnvironment_08.png","medievalEnvironment_09.png","medievalEnvironment_10.png","medievalEnvironment_15.png","medievalEnvironment_16.png"][h%6];
+          const scale=(.75+((h>>>7)%18)/100)*(.58+.42*ratio);
+          const rock=this.add.image(x,y,"kenney",frame).setOrigin(.5,.78).setDepth(y).setScale(depleted?Math.max(.28,scale*.4):scale);
+          if(depleted)rock.setAlpha(.18).setTint(0x716c63);
+          rock.setInteractive({useHandCursor:true});
+          rock.on("pointerdown",(pointer)=>{
+            pointer.event?.stopPropagation?.();
+            showActivity(depleted
+              ? "Roca #"+id+" agotada."
+              : "Roca #"+id+" · "+remaining.toFixed(1)+" / "+capacity.toFixed(1)+" de piedra restante · región ("+row.region_x+", "+row.region_y+").");
+          });
+          const visual={id,nodeType:"rock",x,y,rock,row,harvested:depleted};
+          this.resourceNodeVisuals.set(id,visual);
+          this.persistentResourceVisuals.push(rock);
+        }
+      }
+      return true;
+    }
     syncResourceDepletion(regions){
       const rows=regions||[];
       const woodNow=rows.reduce((s,r)=>s+Number(r.wood_stock||0),0);
