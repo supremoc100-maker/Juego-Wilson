@@ -4,16 +4,19 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#111b15" />
-  <title>Wilson — Aldea viva</title>
-  <link rel="stylesheet" href="./styles.css?v=16" />
+  <title>Wilson — Civilizaciones vivas</title>
+  <link rel="stylesheet" href="./styles.css?v=17" />
 </head>
 <body>
   <main class="app-shell">
     <header class="game-header">
-      <div>
-        <span class="kicker">WILSON · DEMO VISUAL</span>
+      <div class="brand-block">
+        <span class="kicker">WILSON · CIVILIZACIONES VIVAS</span>
         <h1 id="settlementName">Primer Asentamiento</h1>
-        <div class="world-meta"><div id="worldDate" class="world-date">Año 0 · Primavera · Día 1 · 07:00</div><span id="dataMode" class="data-mode">Conectando…</span></div>
+        <div class="world-meta">
+          <div id="worldDate" class="world-date">Año 0 · Primavera · Día 1 · 07:00</div>
+          <span id="dataMode" class="data-mode">Conectando…</span>
+        </div>
       </div>
       <div class="header-stats">
         <div><span>Población</span><strong id="populationStat">25</strong></div>
@@ -41,6 +44,15 @@
         </div>
       </div>
 
+      <nav class="side-nav" aria-label="Secciones de Wilson">
+        <button type="button" data-view="village"><span>⌂</span><small>Aldea</small></button>
+        <button type="button" data-view="people"><span>♟</span><small>Habitantes</small></button>
+        <button type="button" data-view="resources"><span>▣</span><small>Recursos</small></button>
+        <button type="button" data-view="explore"><span>⌖</span><small>Exploración</small></button>
+        <button type="button" data-view="council"><span>⚖</span><small>Consejo</small></button>
+        <button type="button" data-view="history"><span>☷</span><small>Registro</small></button>
+      </nav>
+
       <div id="activityToast" class="activity-toast">
         <span class="pulse"></span>
         <strong>La aldea está despertando.</strong>
@@ -60,33 +72,51 @@
         <div class="skill-row" id="personSkills"></div>
         <button type="button" id="followPerson" class="follow-button">☆ Seguir esta vida</button>
       </aside>
-    </section>
 
-    <section class="command-bar">
-      <div class="command-copy">
-        <span class="kicker">TU INFLUENCIA</span>
-        <strong>Orden estratégica</strong>
-        <small>La población decide cómo cumplirla.</small>
-      </div>
-      <div class="commands">
-        <button type="button" data-command="food"><span>🌾</span>Alimentos</button>
-        <button type="button" data-command="housing"><span>⌂</span>Viviendas</button>
-        <button type="button" data-command="explore"><span>⌖</span>Explorar</button>
-        <button type="button" data-command="storage"><span>▣</span>Reservas</button>
-        <button type="button" data-command="expand"><span>↗</span>Expandir</button>
-      </div>
-    </section>
+      <aside class="objectives-panel" aria-label="Objetivos">
+        <span class="kicker">OBJETIVOS</span>
+        <div id="objectiveList" class="objective-list">
+          <div class="done"><i>✓</i><span>Mantener 25 habitantes</span></div>
+          <div><i>○</i><span>Asegurar reservas de alimentos</span></div>
+          <div><i>○</i><span>Construir 5 viviendas</span></div>
+          <div><i>○</i><span>Explorar la frontera</span></div>
+        </div>
+      </aside>
 
-    <section class="event-strip">
-      <div>
-        <span class="kicker">CRÓNICA EN VIVO</span>
-        <strong id="eventTitle">Fundación del asentamiento</strong>
+      <div class="mini-map-frame" aria-hidden="true">
+        <span>MAPA</span>
+        <b>N</b>
       </div>
-      <p id="eventText">Veinticinco personas comienzan a organizar su primera comunidad.</p>
+
+      <section class="event-strip">
+        <div class="event-heading">
+          <span class="kicker">EVENTOS RECIENTES</span>
+          <strong id="eventTitle">Fundación del asentamiento</strong>
+          <p id="eventText">Veinticinco personas comienzan a organizar su primera comunidad.</p>
+        </div>
+        <div id="eventList" class="event-list">
+          <div><span>●</span><p>La comunidad comienza su historia.</p></div>
+        </div>
+      </section>
+
+      <section class="command-bar">
+        <div class="command-copy">
+          <span class="kicker">TU INFLUENCIA</span>
+          <strong>Orden estratégica</strong>
+          <small>La población decide cómo cumplirla.</small>
+        </div>
+        <div class="commands">
+          <button type="button" data-command="food"><span>🌾</span>Alimentos</button>
+          <button type="button" data-command="housing"><span>⌂</span>Viviendas</button>
+          <button type="button" data-command="explore"><span>⌖</span>Explorar</button>
+          <button type="button" data-command="storage"><span>▣</span>Reservas</button>
+          <button type="button" data-command="expand"><span>↗</span>Expandir</button>
+        </div>
+      </section>
     </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
-  <script src="./src/game.js?v=16"></script>
+  <script src="./src/game.js?v=17"></script>
 </body>
 </html>
