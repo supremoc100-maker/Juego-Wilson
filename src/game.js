@@ -727,6 +727,41 @@
         const role=p.role;
         const rest=()=>this.time.delayedCall(900+Math.random()*1600,()=>this.runPersonCycle(person,0));
 
+        const liveTask=liveMode
+          ? (liveSnapshot?.tasks||[]).find(t=>Number(t.person_id)===Number(p.id))
+          : null;
+        if(liveTask){
+          const target={x:Number(liveTask.target_x),y:Number(liveTask.target_y)};
+          const source={
+            x:Number(liveTask.source_x??1260),
+            y:Number(liveTask.source_y??680)
+          };
+          if(liveTask.task_type==="transport"){
+            const resource=liveTask.resource_type==="wood"?"wood":"stone";
+            const label=resource==="wood"?"madera":"piedra";
+            this.moveRoute(person,[
+              {x:source.x,y:source.y,activity:"Recogiendo "+label+" para "+(liveTask.project_name||"una obra")}
+            ],()=>this.performWork(person,"Cargando "+label,700,()=>{
+              this.setCarry(person,resource,true);
+              this.movePersonTo(person,target,"Transportando "+label+" a "+(liveTask.project_name||"la obra"),()=>{
+                this.setCarry(person,resource,false);
+                this.performWork(person,"Entregando "+Number(liveTask.amount||0).toFixed(1)+" de "+label,850,()=>{
+                  this.movePersonTo(person,home,"Regresando después de la entrega",rest);
+                });
+              });
+            }));
+            return;
+          }
+          if(liveTask.task_type==="build"){
+            this.movePersonTo(person,target,"Dirigiéndose a "+(liveTask.project_name||"la obra"),()=>{
+              this.performWork(person,"Trabajando en "+(liveTask.project_name||"la construcción"),2100,()=>{
+                this.movePersonTo(person,home,"Regresando de la obra",rest);
+              });
+            });
+            return;
+          }
+        }
+
         if(role==="leñador"){
           const tree=this.nearestTree(person);
           if(!tree){this.movePersonTo(person,home,"Regresando a casa",rest);return}
