@@ -120,6 +120,7 @@
         this.storyStructures=[];
         this.storyEffects=[];
         this.projectVisuals=[];
+        this.expansionHistoryVisuals=[];
         this.visualStory={
           logsDelivered:0,
           cropsDelivered:0,
@@ -582,11 +583,67 @@
       this.time.delayedCall(6500,()=>this.ensureConstructionProject(false));
     }
 
+    syncExpansionHistory(rows){
+      for(const item of this.expansionHistoryVisuals||[]){
+        if(Array.isArray(item)){for(const x of item)x?.destroy?.(true)}
+        else item?.destroy?.(true);
+      }
+      this.expansionHistoryVisuals=[];
+
+      for(const row of rows||[]){
+        const target={x:Number(row.target_x),y:Number(row.target_y)};
+        if(!Number.isFinite(target.x)||!Number.isFinite(target.y))continue;
+        const start={x:1300,y:650};
+        const dx=target.x-start.x,dy=target.y-start.y;
+        const len=Math.max(1,Math.hypot(dx,dy));
+        const px=-dy/len,py=dx/len;
+        const points=[
+          start,
+          {x:start.x+dx*.28+px*28,y:start.y+dy*.28+py*28},
+          {x:start.x+dx*.54-px*22,y:start.y+dy*.54-py*22},
+          {x:start.x+dx*.78+px*14,y:start.y+dy*.78+py*14},
+          target
+        ];
+
+        const road=this.add.graphics().setDepth(-9);
+        road.lineStyle(20,0x8f7b5d,.46);
+        road.beginPath();road.moveTo(points[0].x,points[0].y);
+        for(let i=1;i<points.length;i++)road.lineTo(points[i].x,points[i].y);
+        road.strokePath();
+        road.lineStyle(4,0xcab57f,.38);
+        road.beginPath();road.moveTo(points[0].x,points[0].y);
+        for(let i=1;i<points.length;i++)road.lineTo(points[i].x,points[i].y);
+        road.strokePath();
+
+        const area=this.add.graphics().setDepth(-8);
+        area.fillStyle(0x7e8d62,.14).fillCircle(target.x,target.y,92);
+        area.lineStyle(2,0xb9aa77,.32).strokeCircle(target.x,target.y,92);
+
+        const camp=this.add.container(target.x,target.y+10).setDepth(300);
+        camp.add(this.add.ellipse(0,17,74,21,0x203024,.25));
+        camp.add(this.add.triangle(0,-7,-35,25,0,-28,35,25,0x8e6848).setStrokeStyle(2,0x55402f));
+        camp.add(this.add.triangle(0,2,-9,19,0,-8,9,19,0x4e3e31));
+        camp.add(this.add.rectangle(31,-28,3,44,0x61462e));
+        camp.add(this.add.triangle(42,-39,31,-48,31,-29,0x536d55));
+        const tag=this.add.text(target.x,target.y-58,"PUESTO INTEGRADO",{
+          fontFamily:"Manrope",fontSize:"9px",fontStyle:"700",color:"#e3d9b4",
+          backgroundColor:"#17221abb",padding:{x:5,y:2}
+        }).setOrigin(.5).setDepth(3001);
+
+        this.expansionHistoryVisuals.push([road,area,camp,tag]);
+      }
+    }
+
     syncExpansion(row){
       if(!row){
         if(liveMode){
           this.visualStory.expansionActive=false;
           this.visualStory.expansionStatus=null;
+          this.visualStory.expansionId=null;
+          this.expansionTrail?.clear();
+          this.expansionArea?.clear();
+          if(this.expansionCamp){this.expansionCamp.destroy(true);this.expansionCamp=null;}
+          this.expansionLabel?.setPosition(1860,215).setText("FRONTERA").setAlpha(.35);
         }
         return;
       }
@@ -1082,6 +1139,7 @@
       syncActiveOrders(snapshot.orders||[]);
       if(Array.isArray(snapshot.buildings))this.syncBuildings(snapshot.buildings,snapshot.building_instances||null);
       this.syncProjects(snapshot.projects||[]);
+      this.syncExpansionHistory(snapshot.expansion_history||[]);
       this.syncExpansion(snapshot.expansion||null);
 
       if(replacePeople&&Array.isArray(snapshot.people)){
