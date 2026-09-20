@@ -1,14 +1,28 @@
-const CACHE="wilson-v18";
+const CACHE="wilson-v19";
 const CORE=[
   "/",
   "/index.html",
-  "/styles.css?v=18",
-  "/src/game.js?v=18",
+  "/styles.css?v=19",
+  "/src/game.js?v=19",
   "/manifest.webmanifest",
   "/icon.svg",
   "/vendor/phaser-3.90.0.min.js",
   "/assets/kenney/medievalRTS_spritesheet@2.png",
-  "/assets/kenney/medievalRTS_spritesheet@2.xml"
+  "/assets/kenney/medievalRTS_spritesheet@2.xml",
+  "/assets/characters/nino_F.svg",
+  "/assets/characters/nino_M.svg",
+  "/assets/characters/recolector_F.svg",
+  "/assets/characters/recolector_M.svg",
+  "/assets/characters/explorador_F.svg",
+  "/assets/characters/explorador_M.svg",
+  "/assets/characters/cazador_F.svg",
+  "/assets/characters/cazador_M.svg",
+  "/assets/characters/constructor_F.svg",
+  "/assets/characters/constructor_M.svg",
+  "/assets/characters/le%C3%B1ador_F.svg",
+  "/assets/characters/le%C3%B1ador_M.svg",
+  "/assets/characters/agricultor_F.svg",
+  "/assets/characters/agricultor_M.svg"
 ];
 
 self.addEventListener("install",event=>{
