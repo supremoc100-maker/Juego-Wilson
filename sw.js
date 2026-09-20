@@ -1,9 +1,9 @@
-const CACHE="wilson-v33";
+const CACHE="wilson-v34";
 const CORE=[
   "/",
   "/index.html",
-  "/styles.css?v=33",
-  "/src/game.js?v=33",
+  "/styles.css?v=34",
+  "/src/game.js?v=34",
   "/manifest.webmanifest",
   "/icon.svg",
   "/vendor/phaser-3.90.0.min.js",
