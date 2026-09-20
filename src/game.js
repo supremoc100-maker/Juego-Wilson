@@ -111,6 +111,7 @@
         this.setupCamera();
         this.cameras.main.centerOn(1080,720);
         this.cameras.main.setZoom(0.82);
+        this.setupMiniMap();
         this.time.addEvent({delay:5200,loop:true,callback:()=>this.emitVillageEvent()});
         this.time.addEvent({delay:9000,loop:true,callback:()=>this.rebalanceTasks()});
         window.__wilsonStage="ready";
@@ -488,6 +489,8 @@
 
       const latest=snapshot.events?.[0];
       if(latest)updateEvent(latest.title,latest.description);
+      renderEventList(snapshot.events||[]);
+      renderObjectives(snapshot);
       if(Array.isArray(snapshot.buildings))this.syncBuildings(snapshot.buildings);
 
       if(replacePeople&&Array.isArray(snapshot.people)){
@@ -647,6 +650,30 @@
       this.night.disableInteractive();
     }
 
+    setupMiniMap(){
+      const mapWidth=180,mapHeight=128,pad=12;
+      this.miniCam=this.cameras.add(0,0,mapWidth,mapHeight,false,"minimap");
+      this.miniCam.setBounds(0,0,WORLD_W,WORLD_H);
+      this.miniCam.setBackgroundColor("#1b2a20");
+      this.miniCam.setZoom(.105);
+      this.miniCam.centerOn(1080,720);
+      this.miniCam.roundPixels=true;
+
+      const layout=()=>{
+        const visible=this.scale.width>780;
+        this.miniCam.setVisible(visible);
+        if(visible){
+          this.miniCam.setViewport(
+            Math.max(0,this.scale.width-mapWidth-pad),
+            Math.max(0,this.scale.height-mapHeight-pad),
+            mapWidth,mapHeight
+          );
+        }
+      };
+      layout();
+      this.scale.on("resize",layout);
+    }
+
     setupCamera(){
       this.input.on("wheel",(_p,_go,_dx,dy)=>{
         const cam=this.cameras.main;
@@ -777,6 +804,54 @@
   function showActivity(text){$("activityToast").querySelector("strong").textContent=text}
   function updateEvent(title,text){$("eventTitle").textContent=title;$("eventText").textContent=text}
 
+  function renderEventList(events){
+    const root=$("eventList");
+    if(!root)return;
+    root.innerHTML="";
+    const symbols={
+      nacimiento:"✦",muerte:"†",construccion:"⌂",familia:"♥",
+      politica:"⚑",bestia:"!",mayoria_edad:"↑",exploracion:"⌖"
+    };
+    for(const event of (events||[]).slice(0,5)){
+      const row=document.createElement("div");
+      const icon=document.createElement("span");
+      const text=document.createElement("p");
+      icon.textContent=symbols[event.category]||"●";
+      text.textContent=event.title||event.description||"Evento de la comunidad";
+      row.append(icon,text);
+      root.append(row);
+    }
+    if(!root.children.length){
+      const row=document.createElement("div");
+      const icon=document.createElement("span"); icon.textContent="●";
+      const text=document.createElement("p"); text.textContent="La comunidad continúa su historia.";
+      row.append(icon,text); root.append(row);
+    }
+  }
+
+  function renderObjectives(snapshot){
+    const root=$("objectiveList");
+    if(!root)return;
+    const pop=Number(snapshot.summary?.population||0);
+    const foodMonths=Number(snapshot.summary?.food_months||0);
+    const homes=Number((snapshot.buildings||[]).find(b=>b.type==="vivienda")?.count||0);
+    const regions=(snapshot.regions||[]).length;
+    const items=[
+      {done:pop>=25,text:`Mantener 25 habitantes (${pop})`},
+      {done:foodMonths>=6,text:`Reservas para 6 meses (${foodMonths.toFixed(1)})`},
+      {done:homes>=5,text:`Construir 5 viviendas (${homes}/5)`},
+      {done:regions>=5,text:`Explorar 5 regiones (${Math.min(regions,5)}/5)`}
+    ];
+    root.innerHTML="";
+    for(const item of items){
+      const row=document.createElement("div");
+      if(item.done)row.classList.add("done");
+      const icon=document.createElement("i"); icon.textContent=item.done?"✓":"○";
+      const text=document.createElement("span"); text.textContent=item.text;
+      row.append(icon,text); root.append(row);
+    }
+  }
+
   const config={
     type:Phaser.AUTO,parent:"game",backgroundColor:"#71885f",
     width:1280,height:760,physics:{default:"arcade",arcade:{debug:false}},
@@ -793,6 +868,36 @@
   $("zoomIn").addEventListener("click",()=>{if(sceneRef){const c=sceneRef.cameras.main;c.setZoom(clamp(c.zoom+.12,.48,1.45))}});
   $("zoomOut").addEventListener("click",()=>{if(sceneRef){const c=sceneRef.cameras.main;c.setZoom(clamp(c.zoom-.12,.48,1.45))}});
   $("centerCamera").addEventListener("click",()=>{if(sceneRef){sceneRef.cameras.main.pan(1080,720,450,"Sine.easeInOut")}});
+  document.querySelectorAll("[data-view]").forEach(btn=>btn.addEventListener("click",()=>{
+    if(!sceneRef)return;
+    const view=btn.dataset.view;
+    if(view==="village"){
+      sceneRef.cameras.main.pan(1080,720,450,"Sine.easeInOut");
+      showActivity("Vista centrada en el asentamiento.");
+    }else if(view==="people"){
+      const target=sceneRef.people.find(p=>p.person.followed)||sceneRef.people.slice().sort((a,b)=>(b.person.prestige||0)-(a.person.prestige||0))[0];
+      if(target){
+        selectPerson(target);
+        sceneRef.cameras.main.pan(target.x,target.y,400,"Sine.easeInOut");
+      }
+    }else if(view==="resources"){
+      const s=liveSnapshot?.settlement;
+      showActivity(s?`Reservas: ${Math.round(Number(s.food||0))} comida · ${Math.round(Number(s.wood||0))} madera · ${Math.round(Number(s.stone||0))} piedra.`:"Los recursos aparecerán al conectar la simulación persistente.");
+    }else if(view==="explore"){
+      sceneRef.cameras.main.pan(ZONES.explore.x,ZONES.explore.y,500,"Sine.easeInOut");
+      showActivity("La cámara se desplaza hacia la frontera de exploración.");
+    }else if(view==="council"){
+      const panel=document.querySelector(".command-bar");
+      panel?.classList.add("attention");
+      setTimeout(()=>panel?.classList.remove("attention"),850);
+      showActivity("El consejo espera una orden estratégica.");
+    }else if(view==="history"){
+      const panel=document.querySelector(".event-strip");
+      panel?.classList.add("attention");
+      setTimeout(()=>panel?.classList.remove("attention"),850);
+      showActivity("Mostrando los acontecimientos recientes de la comunidad.");
+    }
+  }));
   $("closePerson").addEventListener("click",()=>{
     $("personPanel").classList.add("hidden");
     if(selected){selected.parts.ring.setVisible(false);selected.parts.label.setVisible(false);selected.parts.marker.setVisible(selected.person.followed)}
