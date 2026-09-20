@@ -233,6 +233,8 @@
     }
 
     drawVillage(){
+      this.villageStructures=[];
+      this.villageSmoke=[];
       const village=this.add.graphics().setDepth(-5);
       village.fillStyle(0x72845c,.75).fillCircle(1080,720,345);
       village.fillStyle(0x84906a,.28).fillCircle(1080,720,285);
@@ -255,8 +257,8 @@
         [1320,760,"Vivienda","home",0]
       ];
       houses.forEach(([x,y,label,kind,variant],i)=>{
-        this.makeHouse(x,y,label,kind,variant);
-        if(i===0||i===2||i===6)this.makeSmoke(x+34,y-62,0.75+i*.04);
+        this.villageStructures.push(this.makeHouse(x,y,label,kind,variant));
+        if(i===0||i===2||i===6)this.villageSmoke.push(this.makeSmoke(x+34,y-62,0.75+i*.04));
       });
 
       // Fences and little work clutter make the settlement read as inhabited.
@@ -318,6 +320,7 @@
         });
       }
       smoke.setScale(scale);
+      return smoke;
     }
 
     makeFence(x,y,length=120,angle=0){
@@ -357,6 +360,34 @@
       const core=this.add.triangle(0,-7,-5,7,0,-10,5,7,0xf4d26d);
       c.add([glow,flame,core]);
       this.tweens.add({targets:[flame,core,glow],scaleY:{from:.9,to:1.12},scaleX:{from:1,to:.92},duration:430,yoyo:true,repeat:-1});
+    }
+
+    syncBuildings(buildingRows){
+      if(!Array.isArray(buildingRows)||!buildingRows.length)return;
+      for(const item of this.villageStructures||[])item?.destroy(true);
+      for(const item of this.villageSmoke||[])item?.destroy(true);
+      this.villageStructures=[];
+      this.villageSmoke=[];
+
+      const positions=[
+        [885,610],[1005,555],[1165,575],[1290,650],[900,765],[1025,820],
+        [1195,825],[1320,760],[1080,525],[1380,690],[825,690],[1220,510]
+      ];
+      const visual=[];
+      for(const row of buildingRows){
+        const count=Math.max(0,Number(row.count||0));
+        for(let i=0;i<count;i++)visual.push({type:String(row.type||"vivienda"),index:i});
+      }
+      visual.slice(0,positions.length).forEach((b,i)=>{
+        const [x,y]=positions[i];
+        let kind="home",label="Vivienda";
+        if(["almacen","almacén","storage"].includes(b.type)){kind="storage";label="Almacén"}
+        else if(["taller","workshop"].includes(b.type)){kind="workshop";label="Taller"}
+        else if(["granja","farm"].includes(b.type)){kind="home";label="Granja"}
+        const structure=this.makeHouse(x,y,label,kind,i%3);
+        this.villageStructures.push(structure);
+        if(i%2===0)this.villageSmoke.push(this.makeSmoke(x+30,y-58,.72+(i%3)*.06));
+      });
     }
 
     createPeople(source=PEOPLE){
@@ -428,6 +459,7 @@
         this.applySnapshot(snapshot,true);
         liveMode=true;
         window.__wilsonLive=true;
+        this.startLivePolling();
         showActivity("Simulación persistente conectada. La aldea refleja el estado real del mundo.");
       }catch(err){
         liveMode=false;
@@ -456,12 +488,49 @@
 
       const latest=snapshot.events?.[0];
       if(latest)updateEvent(latest.title,latest.description);
+      if(Array.isArray(snapshot.buildings))this.syncBuildings(snapshot.buildings);
 
       if(replacePeople&&Array.isArray(snapshot.people)){
         this.clearPeople();
         this.createPeople(snapshot.people.filter(p=>p.alive!==false));
       }
       updateClock();
+    }
+
+    startLivePolling(){
+      if(window.__wilsonPoll)clearInterval(window.__wilsonPoll);
+      window.__wilsonPoll=setInterval(()=>this.refreshLiveState(),60000);
+    }
+
+    async refreshLiveState(){
+      if(!liveMode)return;
+      try{
+        const response=await fetch("/api/state",{credentials:"same-origin",headers:{"Accept":"application/json"}});
+        if(!response.ok)return;
+        const snapshot=await response.json();
+        const next=(snapshot.people||[]).filter(p=>p.alive!==false);
+        const currentSig=(this.people||[]).map(p=>`${p.person.id}:${p.person.role}`).sort().join("|");
+        const nextSig=next.map(p=>`${p.id}:${p.profession}`).sort().join("|");
+        if(currentSig!==nextSig){
+          this.applySnapshot(snapshot,true);
+        }else{
+          const byId=new Map(next.map(p=>[p.id,p]));
+          for(const visual of this.people){
+            const raw=byId.get(visual.person.id);
+            if(!raw)continue;
+            visual.person.health=Number(raw.health??visual.person.health);
+            visual.person.energy=Number(raw.energy??visual.person.energy);
+            visual.person.prestige=Number(raw.prestige??visual.person.prestige);
+            visual.person.followed=!!raw.followed;
+            visual.person.discipline=Number(raw.discipline??visual.person.discipline);
+            visual.person.curiosity=Number(raw.curiosity??visual.person.curiosity);
+            visual.person.perception=Number(raw.perception??visual.person.perception);
+            visual.parts.marker.setVisible(visual.person.followed||visual===selected);
+          }
+          this.applySnapshot(snapshot,false);
+          if(selected)updatePersonPanel(selected);
+        }
+      }catch{}
     }
 
     makePerson(data){
@@ -647,8 +716,10 @@
       if(dayMinutes>=1440){
         dayMinutes-=1440;day++;
         if(day>30){day=1;seasonIndex=(seasonIndex+1)%4;if(seasonIndex===0)year++}
-        food=Math.max(0,food-2+Math.floor(Math.random()*5));
-        mood=clamp(mood+(Math.random()>.5?1:-1),62,92);
+        if(!liveMode){
+          food=Math.max(0,food-2+Math.floor(Math.random()*5));
+          mood=clamp(mood+(Math.random()>.5?1:-1),62,92);
+        }
       }
 
       const hour=dayMinutes/60;
