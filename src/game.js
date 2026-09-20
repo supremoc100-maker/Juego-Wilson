@@ -66,17 +66,30 @@
     create(){
       sceneRef=this;
       window.__wilsonScene=this;
-      this.cameras.main.setBounds(0,0,WORLD_W,WORLD_H);
-      this.physics.world.setBounds(0,0,WORLD_W,WORLD_H);
-      this.drawWorld();
-      this.drawVillage();
-      this.createPeople();
-      this.createLighting();
-      this.setupCamera();
-      this.cameras.main.centerOn(1080,720);
-      this.cameras.main.setZoom(0.82);
-      this.time.addEvent({delay:5200,loop:true,callback:()=>this.emitVillageEvent()});
-      this.time.addEvent({delay:9000,loop:true,callback:()=>this.rebalanceTasks()});
+      window.__wilsonStage="bounds";
+      try{
+        this.cameras.main.setBounds(0,0,WORLD_W,WORLD_H);
+        this.physics.world.setBounds(0,0,WORLD_W,WORLD_H);
+        window.__wilsonStage="drawWorld";
+        this.drawWorld();
+        window.__wilsonStage="drawVillage";
+        this.drawVillage();
+        window.__wilsonStage="createPeople";
+        this.createPeople();
+        window.__wilsonStage="lighting";
+        this.createLighting();
+        window.__wilsonStage="camera";
+        this.setupCamera();
+        this.cameras.main.centerOn(1080,720);
+        this.cameras.main.setZoom(0.82);
+        this.time.addEvent({delay:5200,loop:true,callback:()=>this.emitVillageEvent()});
+        this.time.addEvent({delay:9000,loop:true,callback:()=>this.rebalanceTasks()});
+        window.__wilsonStage="ready";
+      }catch(e){
+        window.__wilsonError={message:e?.message||String(e),stack:e?.stack||""};
+        window.__wilsonStage="error";
+        throw e;
+      }
     }
 
     drawWorld(){
