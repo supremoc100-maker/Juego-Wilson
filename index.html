@@ -5,20 +5,22 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#111b15" />
   <title>Wilson — Aldea viva</title>
-  <link rel="stylesheet" href="./styles.css?v=15" />
+  <link rel="stylesheet" href="./styles.css?v=16" />
 </head>
 <body>
   <main class="app-shell">
     <header class="game-header">
       <div>
         <span class="kicker">WILSON · DEMO VISUAL</span>
-        <h1>Primer Asentamiento</h1>
-        <div id="worldDate" class="world-date">Año 0 · Primavera · Día 1 · 07:00</div>
+        <h1 id="settlementName">Primer Asentamiento</h1>
+        <div class="world-meta"><div id="worldDate" class="world-date">Año 0 · Primavera · Día 1 · 07:00</div><span id="dataMode" class="data-mode">Conectando…</span></div>
       </div>
       <div class="header-stats">
         <div><span>Población</span><strong id="populationStat">25</strong></div>
         <div><span>Comida</span><strong id="foodStat">220</strong></div>
-        <div><span>Ánimo</span><strong id="moodStat">78%</strong></div>
+        <div><span>Madera</span><strong id="woodStat">—</strong></div>
+        <div><span>Piedra</span><strong id="stoneStat">—</strong></div>
+        <div><span>Salud</span><strong id="healthStat">78%</strong></div>
       </div>
     </header>
 
@@ -85,6 +87,6 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
-  <script src="./src/game.js?v=15"></script>
+  <script src="./src/game.js?v=16"></script>
 </body>
 </html>
