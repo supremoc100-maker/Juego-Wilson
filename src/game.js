@@ -1627,9 +1627,11 @@
     const taskText=task
       ? (task.task_type==="food_transport"
           ? "Tarea: llevar "+Number(task.amount||0).toFixed(1)+" de comida desde "+(task.source_building_name||"una granja")+" hasta "+(task.target_building_name||"un granero")
-          : task.task_type==="transport"
-            ? "Tarea: transportar "+Number(task.amount||0).toFixed(1)+" de "+(task.resource_type==="wood"?"madera":"piedra")+" a "+(task.project_name||"una obra")
-            : "Tarea: construir en "+(task.project_name||"una obra"))
+          : task.task_type==="resource_harvest"
+            ? "Tarea: extraer "+Number(task.amount||0).toFixed(1)+" de "+(task.resource_type==="wood"?"madera del árbol #":"piedra de la roca #")+(task.source_node_id||"?")+" y llevarla a "+(task.target_building_name||"un depósito")
+            : task.task_type==="transport"
+              ? "Tarea: transportar "+Number(task.amount||0).toFixed(1)+" de "+(task.resource_type==="wood"?"madera":"piedra")+" a "+(task.project_name||"una obra")
+              : "Tarea: construir en "+(task.project_name||"una obra"))
       : p.activity;
     $("personActivity").textContent=taskText;
     $("personHealth").textContent=`${p.health}%`;
