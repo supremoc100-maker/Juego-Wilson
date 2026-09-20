@@ -30,6 +30,20 @@
     agricultor:"Agricultura",cazador:"Caza",explorador:"Exploración",constructor:"Construcción",
     leñador:"Madera",recolector:"Recolección","niño":"Aprendizaje"
   };
+  const ROLE_SPRITES = {
+    agricultor:"medievalUnit_11.png",
+    leñador:"medievalUnit_03.png",
+    constructor:"medievalUnit_02.png",
+    cazador:"medievalUnit_07.png",
+    explorador:"medievalUnit_01.png",
+    recolector:"medievalUnit_08.png",
+    "niño":"medievalUnit_12.png"
+  };
+  const HOUSE_SPRITES = {
+    home:["medievalStructure_09.png","medievalStructure_11.png","medievalStructure_17.png","medievalStructure_18.png","medievalStructure_19.png"],
+    storage:["medievalStructure_21.png","medievalStructure_20.png"],
+    workshop:["medievalStructure_16.png","medievalStructure_03.png"]
+  };
 
   const ZONES = {
     home:{x:1070,y:720,r:250},
@@ -66,6 +80,14 @@
 
   class VillageScene extends Phaser.Scene {
     constructor(){ super("Village"); }
+
+    preload(){
+      this.load.atlasXML(
+        "kenney",
+        "./assets/kenney/medievalRTS_spritesheet@2.png",
+        "./assets/kenney/medievalRTS_spritesheet@2.xml"
+      );
+    }
 
     create(){
       sceneRef=this;
@@ -151,9 +173,16 @@
       }
 
       // farm rows
+      const farmBase=this.add.tileSprite(495,970,340,250,"kenney","medievalTile_13.png").setDepth(-8).setAlpha(.78);
       const f=this.add.graphics().setDepth(-7);
-      f.fillStyle(0x7d713a,.86).fillRoundedRect(330,850,330,240,18);
-      for(let i=0;i<9;i++){f.lineStyle(8,i%2?0xb3a452:0x918741,.85);f.lineBetween(350,875+i*23,638,875+i*23)}
+      f.fillStyle(0x6b5b2d,.16).fillRoundedRect(325,845,340,250,18);
+      for(let i=0;i<9;i++){
+        f.lineStyle(8,i%2?0xb8a653:0x7f773a,.90);
+        f.lineBetween(350,875+i*23,638,875+i*23);
+        if(i%2===0){
+          for(let x=365;x<630;x+=34) f.fillStyle(0x6f8747,.95).fillCircle(x,875+i*23,4);
+        }
+      }
 
       // Ground texture: grass tufts, wild flowers and worn stones.
       for(let i=0;i<145;i++){
@@ -184,25 +213,19 @@
 
     makeTree(x,y,s=1){
       const h=hash("tree-style-"+Math.round(x)+"-"+Math.round(y));
-      const c=this.add.container(x,y).setDepth(y);
-      const shadow=this.add.ellipse(5,23,50*s,18*s,0x243326,.20);
-      const trunk=this.add.rectangle(0,15,10*s,34*s,0x614932).setStrokeStyle(1,0x493624,.45);
-      const trunkHi=this.add.rectangle(-2,12,2*s,25*s,0x876849,.45);
-      const baseColor=[0x315337,0x3a5d3b,0x426842][h%3];
-      const lightColor=[0x50794c,0x557f50,0x5b844f][(h>>>4)%3];
-      const crown1=this.add.circle(0,-10,22*s,baseColor);
-      const crown2=this.add.circle(-14*s,-2,17*s,baseColor);
-      const crown3=this.add.circle(15*s,-1,18*s,baseColor);
-      const crown4=this.add.circle(3*s,-24,15*s,lightColor,.94);
-      const glint=this.add.circle(-8*s,-15*s,7*s,0x759665,.28);
-      c.add([shadow,trunk,trunkHi,crown1,crown2,crown3,crown4,glint]);
-      return c;
+      const frame=["medievalEnvironment_01.png","medievalEnvironment_02.png","medievalEnvironment_03.png","medievalEnvironment_04.png"][h%4];
+      const shadow=this.add.ellipse(x+4,y+18,34*s,13*s,0x223025,.24).setDepth(y-1);
+      const tree=this.add.image(x,y,"kenney",frame).setOrigin(.5,.78).setDepth(y);
+      tree.setScale((1.15+((h>>>8)%24)/100)*s);
+      return tree;
     }
 
     makeRock(x,y,s=1){
-      const r=this.add.ellipse(x,y,34*s,20*s,0x77776a).setDepth(y);
-      this.add.ellipse(x-5*s,y-5*s,20*s,8*s,0x999887,.45).setDepth(y+.1);
-      return r;
+      const h=hash("rock-style-"+Math.round(x)+"-"+Math.round(y));
+      const frame=["medievalEnvironment_07.png","medievalEnvironment_08.png","medievalEnvironment_09.png","medievalEnvironment_10.png","medievalEnvironment_15.png","medievalEnvironment_16.png"][h%6];
+      const rock=this.add.image(x,y,"kenney",frame).setOrigin(.5,.78).setDepth(y);
+      rock.setScale((.95+((h>>>7)%22)/100)*s);
+      return rock;
     }
 
     drawVillage(){
@@ -256,44 +279,24 @@
     }
 
     makeHouse(x,y,label,kind="home",variant=0){
+      const frames=HOUSE_SPRITES[kind]||HOUSE_SPRITES.home;
+      const frame=frames[variant%frames.length];
       const c=this.add.container(x,y).setDepth(y+42);
-      const widths=[82,90,76], heights=[58,64,55];
-      const w=kind==="storage"?104:kind==="workshop"?96:widths[variant%3];
-      const h=kind==="storage"?68:kind==="workshop"?62:heights[variant%3];
-      const roofColor=kind==="storage"?0x574636:kind==="workshop"?0x72452f:[0x846044,0x73513a,0x906b49][variant%3];
-      const wallColor=kind==="storage"?0xb29268:kind==="workshop"?0xbc9870:[0xc6a77b,0xbfa27c,0xcfb487][variant%3];
+      const scale=kind==="storage"?1.45:kind==="workshop"?1.38:1.42;
+      const shadow=this.add.ellipse(4,28,118,34,0x1e2b22,.28);
+      const sprite=this.add.image(0,0,"kenney",frame).setOrigin(.5,.72).setScale(scale);
+      c.add([shadow,sprite]);
 
-      const shadow=this.add.ellipse(5,h/2+14,w+30,30,0x223025,.24);
-      const wall=this.add.rectangle(0,0,w,h,wallColor).setStrokeStyle(2,0x6c5339,.8);
-      const lower=this.add.rectangle(0,h/2-7,w-5,12,0x9b7a55,.28);
-      const roof=this.add.triangle(0,-h/2-27,-w*.66,18,0,-40,w*.66,18,roofColor).setStrokeStyle(2,0x493225,.85);
-      const roofBand=this.add.rectangle(0,-h/2-8,w+12,6,0x5b3b2d,.55);
-      const beamL=this.add.rectangle(-w/2+10,0,4,h-4,0x76583a,.6);
-      const beamR=this.add.rectangle(w/2-10,0,4,h-4,0x76583a,.6);
-      const door=this.add.rectangle(0,h/2-13,17,28,0x5b3d2d).setStrokeStyle(1,0x40291f);
-      const latch=this.add.circle(5,h/2-14,1.8,0xd1aa65);
-      const winColor=0x739397;
-      const window1=this.add.rectangle(-w*.27,-3,13,12,winColor).setStrokeStyle(2,0x5b4935);
-      const window2=this.add.rectangle(w*.27,-3,13,12,winColor).setStrokeStyle(2,0x5b4935);
+      // Warm windows / work glow keep the settlement feeling occupied.
+      const glow=this.add.circle(kind==="workshop"?16:8,5,9,0xf5b957,.18);
+      glow.setBlendMode(Phaser.BlendModes.ADD);
+      c.add(glow);
+      this.tweens.add({targets:glow,alpha:{from:.10,to:.25},scale:{from:.85,to:1.15},duration:1200,yoyo:true,repeat:-1});
 
-      c.add([shadow,wall,lower,roof,roofBand,beamL,beamR,door,latch,window1,window2]);
-
-      if(kind==="storage"){
-        const sign=this.add.rectangle(0,-3,34,12,0x6f5638).setStrokeStyle(1,0x463322);
-        const brace1=this.add.rectangle(-30,5,4,44,0x715238).setAngle(-12);
-        const brace2=this.add.rectangle(30,5,4,44,0x715238).setAngle(12);
-        c.add([sign,brace1,brace2]);
-      }
-      if(kind==="workshop"){
-        const awning=this.add.rectangle(w/2+7,9,27,8,0x6c4b34).setAngle(-7);
-        const bench=this.add.rectangle(w/2+18,24,32,6,0x765437);
-        c.add([awning,bench]);
-      }
-
-      const chimney=this.add.rectangle(w*.28,-h/2-38,12,29,0x776456).setStrokeStyle(1,0x4b4039);
-      c.add(chimney);
-
-      const tag=this.add.text(0,h/2+28,label,{fontFamily:"Manrope",fontSize:"10px",fontStyle:"600",color:"#f6edd5",backgroundColor:"#17221ac7",padding:{x:5,y:2}}).setOrigin(.5);
+      const tag=this.add.text(0,47,label,{
+        fontFamily:"Manrope",fontSize:"10px",fontStyle:"700",color:"#f6edd5",
+        backgroundColor:"#17221ad8",padding:{x:6,y:3}
+      }).setOrigin(.5);
       c.add(tag);
       return c;
     }
@@ -367,77 +370,35 @@
     makePerson(data){
       const isChild=data.age<16;
       const c=this.add.container(data.x,data.y).setDepth(data.y+100);
-      const scale=isChild?.78:1;
-      c.setScale(scale);
 
-      const shadow=this.add.ellipse(0,17,26,9,0x1b261e,.28);
-      const ring=this.add.ellipse(0,17,34,15).setStrokeStyle(2,0xf2d276).setFillStyle(0x000000,0).setVisible(false);
+      const shadow=this.add.ellipse(0,15,isChild?20:28,isChild?7:9,0x18221b,.30);
+      const ring=this.add.ellipse(0,15,isChild?28:38,isChild?12:16)
+        .setStrokeStyle(2,0xf2d276).setFillStyle(0x000000,0).setVisible(false);
 
-      // Legs and arms create a readable walking silhouette.
-      const legL=this.add.rectangle(-5,8,5,16,0x4e4337).setOrigin(.5,0);
-      const legR=this.add.rectangle(5,8,5,16,0x4e4337).setOrigin(.5,0);
-      const body=this.add.rectangle(0,-1,18,28,ROLE_COLORS[data.role]||0x777777).setStrokeStyle(1,0x344239,.65);
-      body.setRoundedRadius?.(5);
-      const belt=this.add.rectangle(0,4,18,4,0x493c30,.8);
-      const accent=this.add.rectangle(0,-8,17,4,ROLE_ACCENTS[data.role]||0xb99d65,.9);
-      const armL=this.add.rectangle(-12,-1,5,20,ROLE_COLORS[data.role]||0x777777).setOrigin(.5,.15);
-      const armR=this.add.rectangle(12,-1,5,20,ROLE_COLORS[data.role]||0x777777).setOrigin(.5,.15);
+      const frame=ROLE_SPRITES[data.role]||ROLE_SPRITES.recolector;
+      const sprite=this.add.image(0,0,"kenney",frame).setOrigin(.5,.76);
+      const baseScale=isChild?.92:1.38;
+      sprite.setScale(baseScale);
 
-      const skin=data.sex==="F"?0xd9ac83:0xc99b75;
-      const head=this.add.circle(0,-22,8.5,skin).setStrokeStyle(1,0x694b39,.45);
-      const hairColor=["0x4b3529","0x674a31","0x3c3028"][hash(data.name)%3];
-      const hair=this.add.arc(0,-25,8.5,180,360,false,Number(hairColor));
-      if(data.sex==="F"&&!isChild){
-        c.add(this.add.ellipse(6,-19,6,14,Number(hairColor)).setAngle(18));
-      }
+      // Profession badge: tiny and readable at mobile zoom.
+      const badgeColor=ROLE_COLORS[data.role]||0x777777;
+      const badge=this.add.circle(12,-21,isChild?3:4,badgeColor).setStrokeStyle(1,0xf2e6c8,.75);
 
-      const marker=this.add.circle(0,-42,4,0xd7bd70).setVisible(false);
-      const label=this.add.text(0,-56,data.name.split(" ")[0],{fontFamily:"Manrope",fontSize:"11px",fontStyle:"700",color:"#fff7df",backgroundColor:"#17221ad9",padding:{x:4,y:2}}).setOrigin(.5).setVisible(false);
+      const marker=this.add.circle(0,-39,4,0xd7bd70).setVisible(false);
+      const label=this.add.text(0,-53,data.name.split(" ")[0],{
+        fontFamily:"Manrope",fontSize:"11px",fontStyle:"700",color:"#fff7df",
+        backgroundColor:"#17221ad9",padding:{x:4,y:2}
+      }).setOrigin(.5).setVisible(false);
 
-      c.add([shadow,ring,legL,legR,armL,armR,body,belt,accent,head,hair]);
-      this.addRoleAccessory(c,data.role,isChild);
-      c.add([marker,label]);
-
-      c.setSize(46,64).setInteractive(new Phaser.Geom.Rectangle(-23,-48,46,68),Phaser.Geom.Rectangle.Contains);
+      c.add([shadow,ring,sprite,badge,marker,label]);
+      c.setSize(48,64).setInteractive(new Phaser.Geom.Rectangle(-24,-48,48,68),Phaser.Geom.Rectangle.Contains);
       c.person={...data,health:96-(hash(data.name+"h")%9),energy:70+(hash(data.name+"e")%28),prestige:hash(data.name+"p")%26,followed:false,activity:"En casa",home:{x:data.x,y:data.y}};
-      c.parts={marker,ring,label,body,legL,legR,armL,armR};
+      c.parts={marker,ring,label,sprite,badge,baseScale};
       c.on("pointerdown",(pointer)=>{
         pointer.event.stopPropagation?.();
         selectPerson(c);
       });
       return c;
-    }
-
-    addRoleAccessory(c,role,isChild){
-      if(isChild){
-        const scarf=this.add.rectangle(0,-12,18,4,0xd1a86a,.9);
-        c.add(scarf);
-        return;
-      }
-      if(role==="agricultor"){
-        const brim=this.add.rectangle(0,-31,23,4,0xc4a85f);
-        const hat=this.add.ellipse(0,-34,14,8,0xb5944e);
-        c.add([brim,hat]);
-      }else if(role==="leñador"){
-        const handle=this.add.rectangle(17,-2,3,27,0x6a4b31).setAngle(-18);
-        const axe=this.add.rectangle(22,-14,10,7,0x8a8b83).setAngle(-18);
-        c.add([handle,axe]);
-      }else if(role==="constructor"){
-        const handle=this.add.rectangle(17,-2,3,24,0x6c4d31).setAngle(-16);
-        const hammer=this.add.rectangle(20,-13,11,5,0x777875).setAngle(-16);
-        c.add([handle,hammer]);
-      }else if(role==="cazador"){
-        const bow=this.add.arc(17,-3,11,250,110,false).setStrokeStyle(2,0x7a5636);
-        const string=this.add.line(0,0,17,-14,17,9,0xcab994,.8);
-        c.add([bow,string]);
-      }else if(role==="explorador"){
-        const pack=this.add.rectangle(-10,-1,9,20,0x644b36).setStrokeStyle(1,0x3d3127);
-        const cloak=this.add.triangle(-3,5,-10,-9,-3,18,5,-9,0x385c63,.68);
-        c.add([pack,cloak]);
-      }else if(role==="recolector"){
-        const basket=this.add.ellipse(15,7,16,11,0x8a6a43).setStrokeStyle(2,0x60492f);
-        c.add(basket);
-      }
     }
 
     targetFor(person){
@@ -469,27 +430,26 @@
         const dist=Phaser.Math.Distance.Between(person.x,person.y,t.x,t.y);
         const speed=person.person.age<16?72:96;
         const duration=Math.max(700,(dist/speed)*1000);
+        const sprite=person.parts.sprite;
+        const base=person.parts.baseScale;
 
         person.walkTween?.stop();
-        person.parts.body.setScale(1.03,.97);
+        sprite.setFlipX(t.x<person.x);
         person.walkTween=this.tweens.add({
-          targets:[person.parts.legL,person.parts.armR],
-          angle:{from:-13,to:13},duration:190,yoyo:true,repeat:-1
-        });
-        person.walkTween2=this.tweens.add({
-          targets:[person.parts.legR,person.parts.armL],
-          angle:{from:13,to:-13},duration:190,yoyo:true,repeat:-1
+          targets:sprite,
+          y:{from:0,to:-3},
+          angle:{from:-1.8,to:1.8},
+          scaleY:{from:base*.97,to:base*1.03},
+          duration:180,yoyo:true,repeat:-1
         });
 
         this.tweens.add({
           targets:person,x:t.x,y:t.y,duration,ease:"Sine.easeInOut",
           onUpdate:()=>{person.setDepth(person.y+100)},
           onComplete:()=>{
-            person.walkTween?.stop();person.walkTween2?.stop();
-            person.parts.legL.setAngle(0);person.parts.legR.setAngle(0);
-            person.parts.armL.setAngle(0);person.parts.armR.setAngle(0);
-            person.parts.body.setScale(1);
-            this.tweens.add({targets:person.parts.body,scaleY:{from:.97,to:1.03},duration:650,yoyo:true,repeat:1});
+            person.walkTween?.stop();
+            sprite.setY(0).setAngle(0).setScale(base);
+            this.tweens.add({targets:sprite,y:{from:0,to:-1.5},duration:600,yoyo:true,repeat:1});
             if(selected===person)updatePersonPanel(person);
             this.scheduleNext(person,900+Math.random()*1700);
           }
