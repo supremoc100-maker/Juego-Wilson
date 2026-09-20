@@ -73,7 +73,7 @@
   let sceneRef;
   let timeScale = 1;
   let selected = null;
-  let command = null;
+  const activeCommands = new Set();
   let dayMinutes = 7 * 60;
   let day = 1;
   let year = 0;
@@ -409,376 +409,41 @@
       this.villageStructures=[];
       this.villageSmoke=[];
 
-      const positions=[
-        [885,610],[1005,555],[1165,575],[1290,650],[900,765],[1025,820],
-        [1195,825],[1320,760],[1080,525],[1380,690],[825,690],[1220,510]
-      ];
-      const visual=[];
+      const layouts={
+        vivienda:[[885,610],[1005,555],[1165,575],[900,765],[1195,825],[1320,760],[1080,525],[1380,690]],
+        almacen:[[1260,680],[1210,610]],
+        granja:[[545,815],[420,805],[640,830]],
+        carpinteria:[[1435,675],[1500,760]],
+        taller:[[1435,675],[1500,760]]
+      };
+      const used=Object.create(null);
+
       for(const row of buildingRows){
+        const type=String(row.type||"vivienda");
         const count=Math.max(0,Number(row.count||0));
-        for(let i=0;i<count;i++)visual.push({type:String(row.type||"vivienda"),index:i});
-      }
-      visual.slice(0,positions.length).forEach((b,i)=>{
-        const [x,y]=positions[i];
-        let kind="home",label="Vivienda";
-        if(["almacen","almacén","storage"].includes(b.type)){kind="storage";label="Almacén"}
-        else if(["taller","workshop"].includes(b.type)){kind="workshop";label="Taller"}
-        else if(["granja","farm"].includes(b.type)){kind="home";label="Granja"}
-        const structure=this.makeHouse(x,y,label,kind,i%3);
-        this.villageStructures.push(structure);
-        if(i%2===0)this.villageSmoke.push(this.makeSmoke(x+30,y-58,.72+(i%3)*.06));
-      });
-    }
-
-    createWorldStories(){
-      this.expansionVisual=this.add.container(0,0).setDepth(-2);
-      this.expansionTrail=this.add.graphics().setDepth(-9);
-      this.expansionArea=this.add.graphics().setDepth(-8);
-      this.expansionLabel=this.add.text(1860,215,"FRONTERA",{fontFamily:"Manrope",fontSize:"12px",fontStyle:"700",color:"#d6cfb1",backgroundColor:"#17221abb",padding:{x:7,y:3}}).setOrigin(.5).setDepth(3000).setAlpha(.55);
-      this.ensureConstructionProject(false);
-    }
-
-    ensureConstructionProject(force=false){
-      if(this.visualStory.construction&&!this.visualStory.construction.complete)return;
-      const sites=[
-        {x:1455,y:730},{x:1515,y:620},{x:1415,y:865},{x:1600,y:725}
-      ];
-      const site=sites[this.visualStory.constructionIndex%sites.length];
-      this.visualStory.constructionIndex++;
-      const container=this.add.container(site.x,site.y).setDepth(site.y+25);
-      const shadow=this.add.ellipse(0,24,112,29,0x223025,.22);
-      const earth=this.add.rectangle(0,13,104,52,0x927b58,.52).setStrokeStyle(2,0x685641,.75);
-      const foundation=this.add.rectangle(0,11,84,40,0xb2a27c,.28).setStrokeStyle(3,0x6e6658,.8);
-      const postA=this.add.rectangle(-33,-2,7,58,0x74543a).setOrigin(.5,1).setScale(1,0.15);
-      const postB=this.add.rectangle(33,-2,7,58,0x74543a).setOrigin(.5,1).setScale(1,0.15);
-      const beam=this.add.rectangle(0,-42,78,7,0x76563b).setAlpha(0);
-      const roof=this.add.triangle(0,-54,-52,17,0,-30,52,17,0x76513b).setAlpha(0);
-      const sign=this.add.text(0,46,"OBRA · 0%",{fontFamily:"Manrope",fontSize:"10px",fontStyle:"700",color:"#f3e6bf",backgroundColor:"#17221ad5",padding:{x:6,y:3}}).setOrigin(.5);
-      container.add([shadow,earth,foundation,postA,postB,beam,roof,sign]);
-      this.visualStory.construction={x:site.x,y:site.y,container,foundation,postA,postB,beam,roof,sign,progress:force?.08:0,complete:false};
-      this.updateConstructionVisual();
-      showActivity(force?"La comunidad ha abierto una nueva obra.":"Los constructores han marcado una futura parcela.");
-    }
-
-    updateConstructionVisual(){
-      const p=this.visualStory.construction;
-      if(!p||p.complete)return;
-      const v=clamp(p.progress,0,1);
-      p.sign.setText(`OBRA · ${Math.round(v*100)}%`);
-      p.foundation.setAlpha(.28+.55*Math.min(1,v/.25));
-      p.postA.setScale(1,.15+.85*clamp((v-.16)/.30,0,1));
-      p.postB.setScale(1,.15+.85*clamp((v-.16)/.30,0,1));
-      p.beam.setAlpha(clamp((v-.42)/.16,0,1));
-      p.roof.setAlpha(clamp((v-.68)/.20,0,1));
-      if(v>=1)this.completeConstruction();
-    }
-
-    advanceConstruction(amount=.10,person=null){
-      const p=this.visualStory.construction;
-      if(!p||p.complete)return;
-      p.progress=Math.min(1,p.progress+amount);
-      this.updateConstructionVisual();
-      if(person)showActivity(`${person.person.name} avanzó la construcción al ${Math.round(p.progress*100)}%.`);
-    }
-
-    completeConstruction(){
-      const p=this.visualStory.construction;
-      if(!p||p.complete)return;
-      p.complete=true;
-      const x=p.x,y=p.y;
-      p.container.destroy(true);
-      const house=this.makeHouse(x,y,"Nueva vivienda","home",this.visualStory.constructionIndex%3);
-      this.storyStructures.push(house);
-      this.villageSmoke.push(this.makeSmoke(x+31,y-58,.72));
-      updateEvent("Nueva vivienda terminada","La construcción cambió físicamente el borde del asentamiento.");
-      showActivity("Una nueva vivienda ha quedado terminada.");
-      this.time.delayedCall(6500,()=>this.ensureConstructionProject(false));
-    }
-
-    activateExpansion(){
-      if(this.visualStory.expansionActive){
-        showActivity("La expedición de expansión continúa avanzando hacia la frontera.");
-        return;
-      }
-      this.visualStory.expansionActive=true;
-      this.visualStory.expansionProgress=Math.max(.08,this.visualStory.expansionProgress);
-      this.expansionLabel.setText("EXPANSIÓN EN CURSO").setAlpha(1);
-      this.updateExpansionVisual();
-      updateEvent("Comienza una expansión","Exploradores abandonan el núcleo para establecer una nueva posición.");
-      showActivity("La expansión ya tiene un destino físico fuera de la aldea.");
-    }
-
-    updateExpansionVisual(){
-      const v=clamp(this.visualStory.expansionProgress,0,1);
-      this.expansionTrail.clear();
-      this.expansionArea.clear();
-      const points=[
-        {x:1300,y:650},{x:1490,y:540},{x:1650,y:420},{x:1790,y:315},{x:1900,y:260}
-      ];
-      const usable=Math.max(2,Math.ceil(1+v*(points.length-1)));
-      this.expansionTrail.lineStyle(24,0x9d8b67,.25+.42*v);
-      this.expansionTrail.beginPath();
-      this.expansionTrail.moveTo(points[0].x,points[0].y);
-      for(let i=1;i<usable;i++)this.expansionTrail.lineTo(points[i].x,points[i].y);
-      this.expansionTrail.strokePath();
-      this.expansionTrail.lineStyle(4,0xd1bb86,.28+.30*v);
-      this.expansionTrail.beginPath();
-      this.expansionTrail.moveTo(points[0].x,points[0].y);
-      for(let i=1;i<usable;i++)this.expansionTrail.lineTo(points[i].x,points[i].y);
-      this.expansionTrail.strokePath();
-
-      if(v>.28){
-        const radius=35+v*75;
-        this.expansionArea.fillStyle(0x9d9368,.12+.16*v).fillCircle(1900,260,radius);
-        this.expansionArea.lineStyle(3,0xc5b27c,.28+.28*v).strokeCircle(1900,260,radius);
-      }
-      if(v>.52&&!this.expansionCamp){
-        this.expansionCamp=this.add.container(1900,270).setDepth(300);
-        const shadow=this.add.ellipse(0,17,70,20,0x203024,.25);
-        const tent=this.add.triangle(0,-7,-35,25,0,-28,35,25,0x8e6848).setStrokeStyle(2,0x55402f);
-        const flap=this.add.triangle(0,2,-9,19,0,-8,9,19,0x4e3e31);
-        const flag=this.add.rectangle(31,-28,3,44,0x61462e);
-        const cloth=this.add.triangle(42,-39,31,-48,31,-29,0x536d55);
-        this.expansionCamp.add([shadow,tent,flap,flag,cloth]);
-        updateEvent("Campamento de frontera","La expedición ha establecido presencia permanente fuera del núcleo.");
-      }
-      this.expansionLabel.setAlpha(.55+.45*v);
-      if(v>=1)this.expansionLabel.setText("NUEVA ZONA INTEGRADA");
-    }
-
-    advanceExpansion(person,amount=.14){
-      if(!this.visualStory.expansionActive)this.activateExpansion();
-      this.visualStory.expansionProgress=Math.min(1,this.visualStory.expansionProgress+amount);
-      this.updateExpansionVisual();
-      showActivity(`${person.person.name} amplió el conocimiento de la nueva zona.`);
-      if(this.visualStory.expansionProgress>=1){
-        updateEvent("Expansión consolidada","La nueva zona ya está conectada visualmente con el asentamiento.");
-      }
-    }
-
-    nearestTree(person){
-      const candidates=this.resourceTrees.filter(t=>!t.harvested&&!t.reserved&&t.zone==="forest");
-      if(!candidates.length)return null;
-      candidates.sort((a,b)=>Phaser.Math.Distance.Between(person.x,person.y,a.x,a.y)-Phaser.Math.Distance.Between(person.x,person.y,b.x,b.y));
-      const pick=candidates[Math.min(candidates.length-1,hash(person.person.id+"-"+this.visualStory.logsDelivered)%Math.min(8,candidates.length))];
-      pick.reserved=true;
-      return pick;
-    }
-
-    markTreeHarvested(node,person){
-      if(!node||node.harvested)return;
-      node.harvested=true;node.reserved=false;
-      this.tweens.add({targets:node.container,alpha:.12,scaleX:.72,scaleY:.38,duration:650,onComplete:()=>{
-        node.container.setVisible(false);
-        const stump=this.add.container(node.x,node.y).setDepth(node.y);
-        stump.add(this.add.ellipse(0,6,22,10,0x71513a));
-        stump.add(this.add.ellipse(0,3,17,7,0xb38a57).setStrokeStyle(1,0x5d4532));
-        this.storyEffects.push(stump);
-      }});
-      this.visualStory.logsDelivered++;
-      if(this.visualStory.logsDelivered%3===0)updateEvent("El bosque retrocede",`${person.person.name} y los leñadores están trabajando cada vez más lejos del centro.`);
-    }
-
-    setCarry(person,type,on){
-      if(person.carryVisual){person.carryVisual.destroy();person.carryVisual=null}
-      if(!on)return;
-      if(type==="wood"){
-        person.carryVisual=this.add.rectangle(0,-34,28,7,0x765136).setStrokeStyle(1,0x4d3828);
-      }else{
-        person.carryVisual=this.add.circle(0,-33,8,0xb29a56).setStrokeStyle(1,0x6c5c37);
-      }
-      person.add(person.carryVisual);
-    }
-
-    movePersonTo(person,target,activity,onComplete){
-      if(!person.active)return;
-      person.person.activity=activity;
-      if(selected===person)updatePersonPanel(person);
-      const sprite=person.parts.sprite;
-      const base=person.parts.baseScale;
-      const dist=Phaser.Math.Distance.Between(person.x,person.y,target.x,target.y);
-      const duration=Math.max(500,(dist/(person.person.age<16?72:105))*1000);
-      person.walkTween?.stop();
-      sprite.setFlipX(target.x<person.x);
-      person.walkTween=this.tweens.add({
-        targets:sprite,y:{from:0,to:-3},angle:{from:-1.7,to:1.7},
-        scaleY:{from:base*.97,to:base*1.03},duration:180,yoyo:true,repeat:-1
-      });
-      this.tweens.add({
-        targets:person,x:target.x,y:target.y,duration,ease:"Sine.easeInOut",
-        onUpdate:()=>person.setDepth(person.y+100),
-        onComplete:()=>{
-          person.walkTween?.stop();
-          sprite.setY(0).setAngle(0).setScale(base);
-          if(onComplete)onComplete();
-        }
-      });
-    }
-
-    moveRoute(person,stops,onComplete,index=0){
-      if(index>=stops.length){if(onComplete)onComplete();return}
-      const stop=stops[index];
-      this.movePersonTo(person,stop,stop.activity||person.person.activity,()=>this.moveRoute(person,stops,onComplete,index+1));
-    }
-
-    performWork(person,label,duration,onComplete){
-      person.person.activity=label;
-      if(selected===person)updatePersonPanel(person);
-      const sprite=person.parts.sprite;
-      const base=person.parts.baseScale;
-      const spark=this.add.circle(person.x+12,person.y-30,4,0xe0bd68,.8).setDepth(person.y+200);
-      this.tweens.add({targets:spark,y:person.y-58,alpha:0,scale:1.8,duration:700,repeat:1,onComplete:()=>spark.destroy()});
-      const work=this.tweens.add({targets:sprite,angle:{from:-5,to:5},y:{from:0,to:-2},duration:220,yoyo:true,repeat:-1});
-      this.time.delayedCall(duration,()=>{
-        work.stop();sprite.setAngle(0).setY(0).setScale(base);
-        if(onComplete)onComplete();
-      });
-    }
-
-    runPersonCycle(person,delay=0){
-      this.time.delayedCall(delay,()=>{
-        if(!person.active)return;
-        const p=person.person;
-        const home=p.home;
-        const role=p.role;
-        const rest=()=>this.time.delayedCall(900+Math.random()*1600,()=>this.runPersonCycle(person,0));
-
-        if(role==="leñador"){
-          const tree=this.nearestTree(person);
-          if(!tree){this.movePersonTo(person,home,"Regresando a casa",rest);return}
-          const route=[
-            {x:1370,y:650,activity:"Caminando hacia el bosque"},
-            {x:1540,y:560,activity:"Siguiendo el sendero forestal"},
-            {x:tree.x,y:tree.y,activity:"Llegando al árbol seleccionado"}
-          ];
-          this.moveRoute(person,route,()=>this.performWork(person,"Talando un árbol",1700,()=>{
-            this.markTreeHarvested(tree,person);
-            this.setCarry(person,"wood",true);
-            this.moveRoute(person,[
-              {x:1540,y:560,activity:"Transportando madera"},
-              {x:1370,y:650,activity:"Regresando con madera"},
-              {x:1260,y:680,activity:"Entregando madera en el almacén"}
-            ],()=>{
-              this.setCarry(person,"wood",false);
-              this.performWork(person,"Descargando madera",650,()=>this.movePersonTo(person,home,"Volviendo a casa",rest));
-            });
-          }));
-          return;
-        }
-
-        if(role==="constructor"){
-          if(command==="housing")this.ensureConstructionProject(true);
-          const project=this.visualStory.construction;
-          if(!project||project.complete){this.movePersonTo(person,home,"Esperando una nueva obra",rest);return}
-          this.moveRoute(person,[
-            {x:1260,y:680,activity:"Recogiendo materiales"},
-            {x:1390,y:705,activity:"Transportando materiales"},
-            {x:project.x,y:project.y,activity:"Llegando a la obra"}
-          ],()=>this.performWork(person,"Construyendo físicamente",1800,()=>{
-            this.advanceConstruction(.09+((hash(p.id+"build")%5)/100),person);
-            this.movePersonTo(person,home,"Regresando de la obra",rest);
-          }));
-          return;
-        }
-
-        if(role==="agricultor"){
-          const h=hash(p.id+"field");
-          const field={x:380+(h%230),y:890+((h>>>8)%150)};
-          this.moveRoute(person,[
-            {x:850,y:805,activity:"Saliendo hacia los campos"},
-            {x:660,y:900,activity:"Siguiendo el camino agrícola"},
-            {x:field.x,y:field.y,activity:"Llegando a su parcela"}
-          ],()=>this.performWork(person,"Trabajando su parcela",1800,()=>{
-            this.visualStory.cropsDelivered++;
-            this.setCarry(person,"food",true);
-            this.moveRoute(person,[
-              {x:660,y:900,activity:"Llevando cosecha"},
-              {x:950,y:770,activity:"Regresando a la aldea"},
-              {x:1260,y:680,activity:"Entregando alimentos"}
-            ],()=>{
-              this.setCarry(person,"food",false);
-              if(this.visualStory.cropsDelivered%4===0)updateEvent("Cosecha entregada","Los campos alimentan de forma visible las reservas del asentamiento.");
-              this.movePersonTo(person,home,"Volviendo a casa",rest);
-            });
-          }));
-          return;
-        }
-
-        if(role==="explorador"){
-          if(command==="expand"||this.visualStory.expansionActive){
-            this.activateExpansion();
-            this.moveRoute(person,[
-              {x:1320,y:640,activity:"Abandonando el núcleo"},
-              {x:1510,y:520,activity:"Siguiendo la ruta de expansión"},
-              {x:1690,y:400,activity:"Explorando terreno nuevo"},
-              {x:1900,y:260,activity:"Reconociendo la nueva zona"}
-            ],()=>this.performWork(person,"Cartografiando la frontera",1500,()=>{
-              this.advanceExpansion(person,.12);
-              this.visualStory.explorationTrips++;
-              this.moveRoute(person,[
-                {x:1690,y:400,activity:"Regresando de la frontera"},
-                {x:1450,y:550,activity:"Volviendo con información"},
-                {x:1120,y:700,activity:"Informando al consejo"}
-              ],()=>this.movePersonTo(person,home,"Regresando a casa",rest));
-            }));
-          }else{
-            const far=[
-              {x:1490,y:340},{x:1770,y:205},{x:2070,y:330},{x:2040,y:690}
-            ];
-            const dest=far[hash(p.id+"explore-"+this.visualStory.explorationTrips)%far.length];
-            this.moveRoute(person,[
-              {x:1370,y:570,activity:"Saliendo de exploración"},
-              {x:1650,y:430,activity:"Atravesando territorio conocido"},
-              {x:dest.x,y:dest.y,activity:"Explorando lejos de la aldea"}
-            ],()=>this.performWork(person,"Observando y cartografiando",1300,()=>{
-              this.visualStory.explorationTrips++;
-              this.movePersonTo(person,{x:1120,y:700},"Regresando de expedición",()=>this.movePersonTo(person,home,"Descansando tras explorar",rest));
-            }));
+        for(let i=0;i<count;i++){
+          const key=type==="almacén"?"almacen":type;
+          const list=layouts[key]||layouts.vivienda;
+          const idx=used[key]||0;
+          used[key]=idx+1;
+          const [x,y]=list[idx%list.length];
+          let kind="home",label="Vivienda";
+          if(key==="almacen"){kind="storage";label="Almacén"}
+          else if(key==="granja"){kind="home";label="Granja"}
+          else if(key==="carpinteria"||key==="taller"){kind="workshop";label="Carpintería"}
+          const structure=this.makeHouse(x,y,label,kind,idx%3);
+          this.villageStructures.push(structure);
+          if(key==="granja"){
+            const fence=this.makeFence(x-35,y+55,100,-4);
+            this.villageStructures.push(fence);
           }
-          return;
+          if(key==="carpinteria"||key==="taller"){
+            const logs=this.makeLogPile(x+55,y+35);
+            this.villageStructures.push(logs);
+          }
+          if(key!=="granja" && idx%2===0)this.villageSmoke.push(this.makeSmoke(x+30,y-58,.72+(idx%3)*.06));
         }
-
-        if(role==="recolector"){
-          const h=hash(p.id+"gather-"+this.visualStory.cropsDelivered);
-          const patch={x:330+(h%310),y:320+((h>>>8)%250)};
-          this.moveRoute(person,[
-            {x:820,y:610,activity:"Saliendo a recolectar"},
-            {x:650,y:500,activity:"Buscando recursos silvestres"},
-            {x:patch.x,y:patch.y,activity:"Llegando a una zona de recolección"}
-          ],()=>this.performWork(person,"Recolectando plantas y bayas",1500,()=>{
-            this.setCarry(person,"food",true);
-            this.movePersonTo(person,{x:1260,y:680},"Llevando lo recolectado al almacén",()=>{
-              this.setCarry(person,"food",false);
-              this.movePersonTo(person,home,"Regresando a casa",rest);
-            });
-          }));
-          return;
-        }
-
-        if(role==="cazador"){
-          const h=hash(p.id+"hunt-"+this.visualStory.explorationTrips);
-          const dest={x:1760+(h%300),y:700+((h>>>8)%180)};
-          this.moveRoute(person,[
-            {x:1390,y:690,activity:"Saliendo de caza"},
-            {x:1600,y:720,activity:"Siguiendo rastros"},
-            {x:dest.x,y:dest.y,activity:"Rastreando animales"}
-          ],()=>this.performWork(person,"Cazando en el exterior",1700,()=>{
-            this.setCarry(person,"food",true);
-            this.movePersonTo(person,{x:1260,y:680},"Regresando con provisiones",()=>{
-              this.setCarry(person,"food",false);
-              this.movePersonTo(person,home,"Volviendo a casa",rest);
-            });
-          }));
-          return;
-        }
-
-        const h=hash(p.id+"child");
-        const school={x:980+(h%150),y:875+((h>>>7)%95)};
-        this.moveRoute(person,[
-          {x:1070,y:790,activity:"Caminando por la aldea"},
-          {x:school.x,y:school.y,activity:"Aprendiendo y ayudando"}
-        ],()=>this.performWork(person,"Aprendiendo con otros niños",1100,()=>this.movePersonTo(person,home,"Regresando a casa",rest)));
-      });
+      }
     }
 
     createPeople(source=PEOPLE){
@@ -881,6 +546,7 @@
       if(latest)updateEvent(latest.title,latest.description);
       renderEventList(snapshot.events||[]);
       renderObjectives(snapshot);
+      syncActiveOrders(snapshot.orders||[]);
       if(Array.isArray(snapshot.buildings))this.syncBuildings(snapshot.buildings);
 
       if(replacePeople&&Array.isArray(snapshot.people)){
@@ -982,9 +648,10 @@
     }
 
     rebalanceTasks(){
-      if(command){
+      if(activeCommands.size){
         const count=this.people.filter(p=>p.person.role!=="niño").length;
-        showActivity(`El consejo mantiene la prioridad de ${commandLabel(command)}. ${count} adultos ajustan sus rutinas.`);
+        const labels=[...activeCommands].map(commandLabel).join(", ");
+        showActivity(`Prioridades activas: ${labels}. ${count} adultos ajustan sus rutinas.`);
       }
     }
 
@@ -1178,24 +845,39 @@
     }
   }
 
+  function syncActiveOrders(orders){
+    activeCommands.clear();
+    for(const order of orders||[]){
+      if(order.status==="active")activeCommands.add(order.type);
+    }
+    document.querySelectorAll("[data-command]").forEach(btn=>{
+      btn.classList.toggle("active",activeCommands.has(btn.dataset.command));
+      btn.setAttribute("aria-pressed",activeCommands.has(btn.dataset.command)?"true":"false");
+    });
+  }
+
   function renderObjectives(snapshot){
     const root=$("objectiveList");
     if(!root)return;
     const pop=Number(snapshot.summary?.population||0);
+    const housing=Number(snapshot.settlement?.housing_capacity||0);
+    const freeHousing=housing-pop;
     const foodMonths=Number(snapshot.summary?.food_months||0);
-    const homes=Number((snapshot.buildings||[]).find(b=>b.type==="vivienda")?.count||0);
+    const farms=Number((snapshot.buildings||[]).find(b=>b.type==="granja")?.count||0);
+    const carpentry=Number((snapshot.buildings||[]).find(b=>b.type==="carpinteria")?.count||0);
     const regions=(snapshot.regions||[]).length;
     const items=[
-      {done:pop>=25,text:`Mantener 25 habitantes (${pop})`},
-      {done:foodMonths>=6,text:`Reservas para 6 meses (${foodMonths.toFixed(1)})`},
-      {done:homes>=5,text:`Construir 5 viviendas (${homes}/5)`},
-      {done:regions>=5,text:`Explorar 5 regiones (${Math.min(regions,5)}/5)`}
+      {done:freeHousing>=4,text:freeHousing>=4?`Vivienda estable · ${freeHousing} plazas libres`:`Consejo: ampliar vivienda · solo ${Math.max(0,freeHousing)} plazas libres`},
+      {done:foodMonths>=6,text:foodMonths>=6?`Reservas estables · ${foodMonths.toFixed(1)} meses`:`Consejo: reforzar alimentos · ${foodMonths.toFixed(1)} meses`},
+      {done:farms>0,text:farms>0?`Infraestructura agrícola · ${farms} granja(s)`:"Consejo: aún no existe una granja permanente"},
+      {done:carpentry>0,text:carpentry>0?`Carpintería operativa · ${carpentry}`:"Consejo: falta una carpintería estable"},
+      {done:regions>=9,text:regions>=9?`Frontera conocida · ${regions} regiones`:`Consejo: explorar más territorio · ${regions} regiones`}
     ];
     root.innerHTML="";
     for(const item of items){
       const row=document.createElement("div");
       if(item.done)row.classList.add("done");
-      const icon=document.createElement("i"); icon.textContent=item.done?"✓":"○";
+      const icon=document.createElement("i"); icon.textContent=item.done?"✓":"!";
       const text=document.createElement("span"); text.textContent=item.text;
       row.append(icon,text); root.append(row);
     }
@@ -1278,27 +960,69 @@
     showActivity(selected.person.followed?`Ahora sigues la vida de ${selected.person.name}.`:`Dejaste de seguir a ${selected.person.name}.`);
   });
   document.querySelectorAll("[data-command]").forEach(btn=>btn.addEventListener("click",async()=>{
-    command=btn.dataset.command;
-    document.querySelectorAll("[data-command]").forEach(b=>b.classList.toggle("active",b===btn));
-    if(command==="expand")sceneRef?.activateExpansion();
-    if(command==="housing")sceneRef?.ensureConstructionProject(true);
-    showActivity(`Orden enviada: priorizar ${commandLabel(command)}. La población decidirá cómo responder.`);
-    updateEvent("Nueva orden estratégica",`La comunidad recibió la instrucción de priorizar ${commandLabel(command)} durante los próximos ciclos.`);
+    const type=btn.dataset.command;
+    const activate=!activeCommands.has(type);
+    if(activate)activeCommands.add(type); else activeCommands.delete(type);
+    btn.classList.toggle("active",activate);
+    btn.setAttribute("aria-pressed",activate?"true":"false");
+
+    if(activate&&type==="expand")sceneRef?.activateExpansion();
+    if(activate&&type==="housing")sceneRef?.ensureConstructionProject(true);
+
+    const activeLabels=[...activeCommands].map(commandLabel);
+    showActivity(activate
+      ? `Prioridad añadida: ${commandLabel(type)}. Activas: ${activeLabels.join(", ")||"ninguna"}.`
+      : `Prioridad retirada: ${commandLabel(type)}. Activas: ${activeLabels.join(", ")||"ninguna"}.`);
+    updateEvent(
+      activate?"Nueva prioridad estratégica":"Prioridad retirada",
+      activate
+        ? `La comunidad recibió la instrucción de priorizar ${commandLabel(type)} junto con las demás órdenes activas.`
+        : `La prioridad ${commandLabel(type)} dejó de ser un mandato activo.`
+    );
 
     if(liveMode){
       try{
         const response=await fetch("/api/order",{
           method:"POST",credentials:"same-origin",
           headers:{"Content-Type":"application/json","Accept":"application/json"},
-          body:JSON.stringify({type:command,weight:35})
+          body:JSON.stringify({type,weight:35,active:activate})
         });
         if(!response.ok)throw new Error("order "+response.status);
         const snapshot=await response.json();
         sceneRef?.applySnapshot(snapshot,false);
-        showActivity(`Orden persistida: priorizar ${commandLabel(command)}.`);
       }catch(err){
-        showActivity("La orden visual se aplicó, pero no pudo persistirse. Verifica tu sesión de Hatchable.");
+        if(activate)activeCommands.delete(type); else activeCommands.add(type);
+        btn.classList.toggle("active",activeCommands.has(type));
+        showActivity("No se pudo guardar el cambio de prioridad. Se restauró el estado anterior.");
       }
     }
   }));
+
+  const newGameBtn=$("newGameBtn");
+  const newGameModal=$("newGameModal");
+  const cancelNewGame=$("cancelNewGame");
+  const confirmNewGame=$("confirmNewGame");
+  newGameBtn?.addEventListener("click",()=>newGameModal?.classList.remove("hidden"));
+  cancelNewGame?.addEventListener("click",()=>newGameModal?.classList.add("hidden"));
+  confirmNewGame?.addEventListener("click",async()=>{
+    confirmNewGame.disabled=true;
+    confirmNewGame.textContent="Creando mundo…";
+    try{
+      const response=await fetch("/api/new-game",{
+        method:"POST",credentials:"same-origin",
+        headers:{"Content-Type":"application/json","Accept":"application/json"},
+        body:JSON.stringify({confirm:"NUEVA_PARTIDA"})
+      });
+      if(!response.ok)throw new Error("new game "+response.status);
+      if("serviceWorker" in navigator){
+        const regs=await navigator.serviceWorker.getRegistrations();
+        for(const reg of regs)await reg.update().catch(()=>{});
+      }
+      location.reload();
+    }catch(err){
+      confirmNewGame.disabled=false;
+      confirmNewGame.textContent="Sí, crear nueva partida";
+      showActivity("No se pudo crear la nueva partida.");
+    }
+  });
 })();
