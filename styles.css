@@ -302,3 +302,29 @@ h1{font-size:24px;line-height:1.05;margin-top:2px}
   .portrait-wrap img{width:68px;height:90px}
   .person-panel h2,.person-panel>p{text-align:left}
 }
+
+.objectives-note{display:block;margin-top:4px;color:#9eaa9f;font-size:8px;line-height:1.35}
+.commands button[aria-pressed="true"]::before{
+  content:"✓";position:absolute;right:6px;top:4px;width:14px;height:14px;border-radius:50%;
+  display:grid;place-items:center;background:#6f8f58;color:#fff;font-size:8px;font-weight:800
+}
+.side-nav .danger-nav{border-color:rgba(177,92,71,.34);color:#e1c6be}
+.side-nav .danger-nav span{color:#c9836f}
+.new-game-modal{
+  position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:18px;
+  background:rgba(5,9,6,.76);backdrop-filter:blur(7px)
+}
+.new-game-modal.hidden{display:none}
+.new-game-card{
+  width:min(480px,100%);padding:20px;border-radius:12px;
+  border:1px solid rgba(211,183,111,.38);
+  background:linear-gradient(150deg,#1d2b21,#101912);
+  box-shadow:0 30px 70px rgba(0,0,0,.55)
+}
+.new-game-card h2{font-size:24px;margin:5px 0 10px}
+.new-game-card p{color:#b9c3ba;font-size:11px;line-height:1.55}
+.new-game-warning{padding:9px;border-left:3px solid #b66f59;background:rgba(182,111,89,.08);color:#e0c7bf!important}
+.new-game-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}
+.new-game-actions button{border:1px solid var(--line);border-radius:7px;padding:9px 12px;background:#1d2a21;color:#e7ece7;cursor:pointer}
+.new-game-actions .danger-action{border-color:#8f5545;background:#4a2d25;color:#f5ded6}
+.new-game-actions button:disabled{opacity:.55;cursor:wait}
