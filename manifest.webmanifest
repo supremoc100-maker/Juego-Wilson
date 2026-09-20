@@ -1,0 +1,18 @@
+{
+  "name": "Wilson — Civilizaciones Vivas",
+  "short_name": "Wilson",
+  "description": "Simulación persistente de una civilización autónoma.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0d1510",
+  "theme_color": "#17231b",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
