@@ -67,3 +67,93 @@ h1{font-size:24px;line-height:1.05;margin-top:2px}
   .commands{grid-template-columns:repeat(5,1fr)}
   .commands button{padding:4px 1px}
 }
+
+/* Wilson Visual V1 — richer game framing */
+.game-header{
+  position:relative;
+  box-shadow:0 10px 30px rgba(0,0,0,.22);
+  background:
+    radial-gradient(circle at 18% 0%,rgba(211,183,111,.08),transparent 34%),
+    linear-gradient(180deg,#1b2b20,#0e1711);
+}
+.game-header::after{
+  content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(211,183,111,.45),transparent)
+}
+.header-stats>div{
+  background:rgba(255,255,255,.025);
+  border:1px solid rgba(255,255,255,.055);
+  border-left-color:rgba(211,183,111,.28);
+  border-radius:5px;
+}
+.game-stage{box-shadow:inset 0 0 55px rgba(4,10,6,.18)}
+.speed-controls,.camera-controls{
+  border-radius:9px;
+  box-shadow:0 8px 25px rgba(0,0,0,.22);
+  border-color:rgba(211,183,111,.18);
+}
+.hud-btn{border-radius:6px;transition:background .15s ease,color .15s ease,transform .15s ease}
+.hud-btn:hover{background:rgba(255,255,255,.07)}
+.hud-btn:active{transform:translateY(1px)}
+.hud-btn.active{
+  background:linear-gradient(180deg,#efe4c4,#d7c48e);
+  box-shadow:inset 0 0 0 1px rgba(83,62,32,.18);
+}
+.activity-toast{
+  border-radius:999px;
+  box-shadow:0 9px 28px rgba(0,0,0,.22);
+  border-color:rgba(211,183,111,.22)
+}
+.person-panel{
+  border-radius:10px;
+  background:
+    linear-gradient(145deg,rgba(28,42,32,.97),rgba(15,25,18,.98));
+  border-color:rgba(211,183,111,.44);
+}
+.person-panel::before{
+  content:"";position:absolute;inset:4px;border:1px solid rgba(211,183,111,.10);
+  border-radius:7px;pointer-events:none
+}
+.person-panel h2{color:#f4e8c6;font-size:22px}
+.person-grid>div{
+  border:1px solid rgba(255,255,255,.045);
+  border-radius:6px;
+  background:linear-gradient(180deg,#26392b,#1c2d22)
+}
+.skill-row span{
+  border-radius:999px;background:rgba(211,183,111,.06);
+  border-color:rgba(211,183,111,.20)
+}
+.follow-button{
+  border-radius:7px;
+  background:linear-gradient(180deg,#40371f,#292417);
+  transition:transform .15s ease,filter .15s ease
+}
+.follow-button:hover{filter:brightness(1.12)}
+.follow-button:active{transform:translateY(1px)}
+.command-bar{
+  background:
+    radial-gradient(circle at 90% 50%,rgba(211,183,111,.055),transparent 34%),
+    #0f1812;
+}
+.commands button{
+  position:relative;overflow:hidden;border-radius:7px;
+  background:linear-gradient(180deg,#213126,#18251d);
+  transition:transform .15s ease,border-color .15s ease,filter .15s ease
+}
+.commands button::after{
+  content:"";position:absolute;left:8px;right:8px;bottom:4px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(211,183,111,.22),transparent)
+}
+.commands button:hover{filter:brightness(1.12);border-color:#586c5d}
+.commands button:active{transform:translateY(1px)}
+.commands button.active{
+  border-color:#b99b58;
+  background:linear-gradient(180deg,#3a3420,#252317);
+  box-shadow:inset 0 0 18px rgba(211,183,111,.08)
+}
+.event-strip{
+  background:
+    linear-gradient(90deg,rgba(211,183,111,.035),transparent 38%),
+    #17231b;
+}
