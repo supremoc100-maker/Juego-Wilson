@@ -157,3 +157,15 @@ h1{font-size:24px;line-height:1.05;margin-top:2px}
     linear-gradient(90deg,rgba(211,183,111,.035),transparent 38%),
     #17231b;
 }
+
+.world-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:3px}
+.data-mode{font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:#d9c47f;border:1px solid rgba(211,183,111,.25);padding:2px 5px;border-radius:999px;background:rgba(211,183,111,.06)}
+.header-stats{flex-wrap:wrap;justify-content:flex-end}
+.header-stats>div{min-width:68px}
+@media(max-width:900px){
+  .header-stats>div:nth-child(4),.header-stats>div:nth-child(5){display:none}
+}
+@media(max-width:620px){
+  .header-stats>div:nth-child(3){display:none}
+  .data-mode{display:none}
+}
