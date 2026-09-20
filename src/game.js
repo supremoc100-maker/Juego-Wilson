@@ -1256,7 +1256,13 @@
     $("personName").textContent=p.name;
     const household=p.household_id?(liveSnapshot?.households||[]).find(h=>Number(h.id)===Number(p.household_id)):null;
     $("personMeta").textContent=`${p.age} años · ${p.role} · ${p.sex==="F"?"mujer":"hombre"}${household?` · ${household.name}`:""}`;
-    $("personActivity").textContent=p.activity;
+    const task=(liveSnapshot?.tasks||[]).find(t=>Number(t.person_id)===Number(p.id));
+    const taskText=task
+      ? (task.task_type==="transport"
+          ? "Tarea: transportar "+Number(task.amount||0).toFixed(1)+" de "+(task.resource_type==="wood"?"madera":"piedra")+" a "+(task.project_name||"una obra")
+          : "Tarea: construir en "+(task.project_name||"una obra"))
+      : p.activity;
+    $("personActivity").textContent=taskText;
     $("personHealth").textContent=`${p.health}%`;
     $("personEnergy").textContent=`${Math.round(p.energy)}%`;
     $("personPrestige").textContent=p.prestige;
@@ -1288,7 +1294,7 @@
     root.innerHTML="";
     const symbols={
       nacimiento:"✦",muerte:"†",construccion:"⌂",familia:"♥",
-      politica:"⚑",bestia:"!",mayoria_edad:"↑",exploracion:"⌖"
+      politica:"⚑",bestia:"!",mayoria_edad:"↑",exploracion:"⌖",logistica:"↔"
     };
     for(const event of (events||[]).slice(0,5)){
       const row=document.createElement("div");
