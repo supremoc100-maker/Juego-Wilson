@@ -78,6 +78,20 @@
         <button type="button" id="followPerson" class="follow-button">☆ Seguir esta vida</button>
       </aside>
 
+      <aside id="buildingPanel" class="building-panel hidden" aria-live="polite">
+        <button type="button" id="closeBuilding" class="close-panel" aria-label="Cerrar">×</button>
+        <span class="kicker">ESTRUCTURA</span>
+        <h2 id="buildingName">—</h2>
+        <p id="buildingMeta">—</p>
+        <div class="building-grid">
+          <div><span>Inventario</span><strong id="buildingInventory">—</strong></div>
+          <div><span>Ocupación</span><strong id="buildingOccupancy">—</strong></div>
+          <div><span>Logística</span><strong id="buildingLogistics">—</strong></div>
+          <div><span>Construida</span><strong id="buildingAge">—</strong></div>
+        </div>
+        <div id="buildingDetail" class="building-detail">Selecciona una estructura del asentamiento para inspeccionarla.</div>
+      </aside>
+
       <aside class="objectives-panel" aria-label="Prioridades del consejo">
         <span class="kicker">PRIORIDADES DEL CONSEJO</span>
         <small class="objectives-note">Se generan por las necesidades reales del asentamiento.</small>
