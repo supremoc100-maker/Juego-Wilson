@@ -83,6 +83,9 @@
   let liveSnapshot = null;
   let liveWorldLabel = null;
   let liveMode = false;
+  let strategicScale = "world";
+  let strategicSection = "world";
+  let selectedStrategic = null;
 
   const seasons = ["Primavera","Verano","Otoño","Invierno"];
   const $ = id => document.getElementById(id);
@@ -1379,6 +1382,9 @@
       const stone=$("stoneStat"); if(stone)stone.textContent=String(Math.round(Number(snapshot.settlement.stone||0)));
       const health=$("healthStat"); if(health)health.textContent=`${Math.round(Number(snapshot.summary?.average_health||100))}%`;
       const mode=$("dataMode"); if(mode)mode.textContent="Simulación persistente";
+      const backendSpeed=Number(snapshot.world.simulation_speed??1);
+      timeScale=[0,1,3,8,20,60,100].includes(backendSpeed)?backendSpeed:1;
+      document.querySelectorAll("[data-speed]").forEach(b=>b.classList.toggle("active",Number(b.dataset.speed)===timeScale));
 
       const latest=snapshot.events?.[0];
       if(latest)updateEvent(latest.title,latest.description);
@@ -1391,6 +1397,7 @@
       if(!exactResources)this.syncResourceDepletion(snapshot.regions||[]);
       this.syncExpansionHistory(snapshot.expansion_history||[]);
       this.syncExpansion(snapshot.expansion||null);
+      if(!$("#strategicView")?.classList.contains("hidden"))renderStrategicMap();
 
       if(replacePeople&&Array.isArray(snapshot.people)){
         this.clearPeople();
@@ -1505,27 +1512,8 @@
     }
 
     setupMiniMap(){
-      const mapWidth=180,mapHeight=128,pad=12;
-      this.miniCam=this.cameras.add(0,0,mapWidth,mapHeight,false,"minimap");
-      this.miniCam.setBounds(0,0,WORLD_W,WORLD_H);
-      this.miniCam.setBackgroundColor("#1b2a20");
-      this.miniCam.setZoom(.105);
-      this.miniCam.centerOn(1080,720);
-      this.miniCam.roundPixels=true;
-
-      const layout=()=>{
-        const visible=this.scale.width>780;
-        this.miniCam.setVisible(visible);
-        if(visible){
-          this.miniCam.setViewport(
-            Math.max(0,this.scale.width-mapWidth-pad),
-            Math.max(0,this.scale.height-mapHeight-pad),
-            mapWidth,mapHeight
-          );
-        }
-      };
-      layout();
-      this.scale.on("resize",layout);
+      // Reemplazado por el mapa estratégico multiescala.
+      this.miniCam=null;
     }
 
     setupCamera(){
@@ -1590,9 +1578,10 @@
 
     update(_time,delta){
       if(timeScale===0){ this.tweens.timeScale=0; this.time.timeScale=0; return; }
-      this.tweens.timeScale=timeScale;
-      this.time.timeScale=timeScale;
-      const minutesAdvance=delta*0.0045*timeScale;
+      const visualScale=Math.min(timeScale,8);
+      this.tweens.timeScale=visualScale;
+      this.time.timeScale=visualScale;
+      const minutesAdvance=delta*0.0045*Math.min(timeScale,20);
       dayMinutes+=minutesAdvance;
       if(dayMinutes>=1440){
         dayMinutes-=1440;day++;
@@ -1738,6 +1727,306 @@
     }
   }
 
+
+  const SVG_NS="http://www.w3.org/2000/svg";
+  function svgEl(name,attrs={}){
+    const el=document.createElementNS(SVG_NS,name);
+    for(const [k,v] of Object.entries(attrs)){
+      if(v!==undefined&&v!==null)el.setAttribute(k,String(v));
+    }
+    return el;
+  }
+  function strategicData(){ return liveSnapshot?.strategic||null; }
+  function civById(id){ return strategicData()?.civilizations?.find(c=>Number(c.id)===Number(id))||null; }
+  function playerCiv(){ return strategicData()?.civilizations?.find(c=>c.player_controlled)||null; }
+  function known(v){ return v&&v!=="unknown"; }
+  function biomeColor(b){
+    return ({
+      pradera:"#687b53",bosque:"#405f43",colinas:"#7a7057",valle:"#73845b",
+      pantano:"#536c61",meseta:"#806f55",tundra:"#82908b",estepa:"#887b56"
+    })[b]||"#66745b";
+  }
+  function mapCoords(x,y){
+    const d=strategicData(),b=d?.bounds||{min_x:-8,max_x:8,min_y:-6,max_y:6};
+    const cols=b.max_x-b.min_x+1,rows=b.max_y-b.min_y+1;
+    const cw=1010/cols,ch=620/rows;
+    return {x:42+(x-b.min_x)*cw,y:42+(y-b.min_y)*ch,cw,ch};
+  }
+  function ownerLabel(region){
+    const c=civById(region.controller_civilization_id||region.owner_civilization_id);
+    return c?.name||"Sin control";
+  }
+  function openStrategicView(section="world",scale=null){
+    strategicSection=section;
+    if(scale)strategicScale=scale;
+    else if(section==="world")strategicScale="world";
+    else if(["kingdom","diplomacy","military","knowledge"].includes(section))strategicScale="kingdom";
+    else strategicScale="region";
+    document.body.classList.add("strategic-open");
+    $("#strategicView")?.classList.remove("hidden");
+    $("#buildingPanel")?.classList.add("hidden");
+    $("#personPanel")?.classList.add("hidden");
+    document.querySelectorAll("[data-map-scale]").forEach(b=>b.classList.toggle("active",b.dataset.mapScale===strategicScale));
+    renderStrategicMap();
+  }
+  function closeStrategicView(){
+    document.body.classList.remove("strategic-open");
+    $("#strategicView")?.classList.add("hidden");
+    selectedStrategic=null;
+  }
+  function strategicOverview(section){
+    const d=strategicData(); if(!d)return;
+    const p=playerCiv();
+    const knownCivs=(d.civilizations||[]).filter(c=>!c.player_controlled&&known(c.known_state));
+    const owned=(d.regions||[]).filter(r=>Number(r.controller_civilization_id)===Number(p?.id));
+    const ownSett=(d.settlements||[]).filter(s=>Number(s.civilization_id)===Number(p?.id));
+    const wars=(d.relations||[]).filter(r=>r.at_war);
+    const threats=(d.monsters||[]).filter(m=>known(m.known_state));
+    const sites=(d.sites||[]).filter(s=>known(s.known_state));
+    const knowledge=(d.knowledge||[]).find(k=>Number(k.civilization_id)===Number(p?.id));
+    const factions=(d.factions||[]).filter(f=>Number(f.civilization_id)===Number(p?.id));
+    const institutions=(d.institutions||[]).filter(i=>Number(i.civilization_id)===Number(p?.id));
+
+    const titles={
+      world:["Mundo conocido","Civilizaciones, territorios desconocidos, ruinas y amenazas."],
+      kingdom:["Tu reino","Fronteras, asentamientos, política, economía y desarrollo."],
+      diplomacy:["Diplomacia","Relaciones con las civilizaciones que tu pueblo conoce."],
+      military:["Ejército y conquista","Fuerzas, campañas, guerras y territorios disputados."],
+      knowledge:["Conocimiento e instituciones","Tecnología, educación, gobierno, mercado, fe y cultura."],
+      region:["Región","Frontera inmediata, rutas, puestos y amenazas cercanas."]
+    };
+    const [title,subtitle]=titles[section]||titles.world;
+    $("#strategicTitle").textContent=title;
+    $("#strategicSubtitle").textContent=subtitle;
+    $("#strategicInfoKicker").textContent=section.toUpperCase();
+    $("#strategicInfoTitle").textContent=p?.name||"Tu civilización";
+    $("#strategicInfoText").textContent=section==="world"
+      ? `El mundo contiene ${knownCivs.length} civilización(es) conocidas, ${threats.length} amenaza(s) identificadas y ${sites.length} sitio(s) de interés.`
+      : section==="diplomacy"
+        ? (knownCivs.length?`Hay contacto o rumores de ${knownCivs.length} potencias extranjeras.`:"Aún no conoces otras potencias.")
+        : section==="military"
+          ? `${wars.length} guerra(s) activa(s). Las fronteras pueden cambiar mediante campañas persistentes.`
+          : section==="knowledge"
+            ? "El conocimiento y las instituciones crecen con el tiempo y condicionan lo que la civilización puede hacer."
+            : `Controlas ${owned.length} región(es) y ${ownSett.length} asentamiento(s) estratégico(s).`;
+
+    const stats=$("#strategicStats"); stats.innerHTML="";
+    const entries=section==="knowledge"
+      ? [
+          ["Agricultura",Number(knowledge?.agriculture||0).toFixed(2)],
+          ["Construcción",Number(knowledge?.construction||0).toFixed(2)],
+          ["Navegación",Number(knowledge?.navigation||0).toFixed(2)],
+          ["Metalurgia",Number(knowledge?.metallurgy||0).toFixed(2)],
+          ["Medicina",Number(knowledge?.medicine||0).toFixed(2)],
+          ["Escritura",Number(knowledge?.writing||0).toFixed(2)]
+        ]
+      : [
+          ["Población",Math.round(Number(p?.population||0))],
+          ["Territorio",owned.length+" regiones"],
+          ["Asentamientos",ownSett.length],
+          ["Riqueza",Math.round(Number(p?.wealth||0))],
+          ["Fuerza militar",Math.round(Number(p?.military_power||0))],
+          ["Estabilidad",Math.round(Number(p?.stability||0))+"%"]
+        ];
+    for(const [k,v] of entries){
+      const box=document.createElement("div");
+      box.innerHTML=`<span>${k}</span><strong>${v}</strong>`;
+      stats.append(box);
+    }
+    $("#strategicActions").innerHTML="";
+    const systems=$("#strategicSystems");systems.innerHTML="";
+    if(section==="kingdom"){
+      const instText=institutions.map(i=>`${i.institution_type}: ${Number(i.level).toFixed(1)}`).join(" · ");
+      const factionText=factions.slice(0,4).map(f=>`${f.name} ${Math.round(Number(f.influence))}%`).join(" · ");
+      systems.innerHTML=
+        `<div class="strategic-system"><strong>Gobierno:</strong> ${p?.government||"emergente"} · Cultura ${Number(p?.culture_level||1).toFixed(1)}</div>`+
+        `<div class="strategic-system"><strong>Instituciones:</strong> ${instText||"en formación"}</div>`+
+        `<div class="strategic-system"><strong>Facciones:</strong> ${factionText||"sin facciones formales"}</div>`;
+    }else if(section==="diplomacy"){
+      for(const civ of knownCivs){
+        const rel=(d.relations||[]).find(r=>[Number(r.civilization_a_id),Number(r.civilization_b_id)].includes(Number(p?.id))&&[Number(r.civilization_a_id),Number(r.civilization_b_id)].includes(Number(civ.id)));
+        const row=document.createElement("div");row.className="strategic-system";
+        row.innerHTML=`<strong>${civ.name}</strong> · ${rel?.stance||"sin contacto"} · confianza ${Math.round(Number(rel?.trust||0))} · tensión ${Math.round(Number(rel?.tension||0))}`;
+        row.onclick=()=>showCivilizationDetail(civ.id);row.style.cursor="pointer";systems.append(row);
+      }
+    }else if(section==="military"){
+      for(const army of d.armies||[]){
+        const civ=civById(army.civilization_id);
+        if(!civ?.player_controlled&&!known(civ?.known_state))continue;
+        const row=document.createElement("div");row.className="strategic-system";
+        row.innerHTML=`<strong>${army.name}</strong> · ${civ?.name||"?"} · fuerza ${Math.round(Number(army.strength))} · ${army.status}`;
+        systems.append(row);
+      }
+    }else if(section==="world"){
+      systems.innerHTML=
+        `<div class="strategic-system"><strong>Historia visible:</strong> carreteras, fronteras, ciudades, puestos y territorios permanecen en el mapa.</div>`+
+        `<div class="strategic-system"><strong>Mundo vivo:</strong> otras civilizaciones crecen, fundan asentamientos y pueden entrar en guerra sin esperar al jugador.</div>`+
+        `<div class="strategic-system"><strong>Fantasía:</strong> guaridas, ruinas y sitios excepcionales existen físicamente y se revelan mediante exploración.</div>`;
+    }
+  }
+  function showRegionDetail(region){
+    selectedStrategic={type:"region",id:region.x+","+region.y};
+    const d=strategicData(),c=civById(region.controller_civilization_id);
+    $("#strategicInfoKicker").textContent="REGIÓN "+region.x+","+region.y;
+    $("#strategicInfoTitle").textContent=known(region.knowledge_state)?region.biome:"Territorio desconocido";
+    $("#strategicInfoText").textContent=!known(region.knowledge_state)
+      ?"Tus habitantes todavía no poseen información fiable sobre esta región."
+      : `Control: ${c?.name||"ninguno"}. Desarrollo ${Math.round(Number(region.development||0))}. Peligro ${Math.round(Number(region.danger||0))}.`;
+    const stats=$("#strategicStats");stats.innerHTML="";
+    for(const [k,v] of [
+      ["Conocimiento",region.knowledge_state],["Control",c?.name||"Libre"],
+      ["Desarrollo",Math.round(Number(region.development||0))],["Camino","Nivel "+Math.round(Number(region.road_level||0))],
+      ["Peligro",Math.round(Number(region.danger||0))],["Estado",region.contested?"Disputada":"Estable"]
+    ]){
+      const box=document.createElement("div");box.innerHTML=`<span>${k}</span><strong>${v}</strong>`;stats.append(box);
+    }
+    $("#strategicActions").innerHTML="";
+    const systems=$("#strategicSystems");systems.innerHTML="";
+    const sett=(d.settlements||[]).filter(s=>Number(s.x)===Number(region.x)&&Number(s.y)===Number(region.y)&&known(s.known_state));
+    const mons=(d.monsters||[]).filter(m=>Number(m.x)===Number(region.x)&&Number(m.y)===Number(region.y)&&known(m.known_state));
+    const sites=(d.sites||[]).filter(s=>Number(s.x)===Number(region.x)&&Number(s.y)===Number(region.y)&&known(s.known_state));
+    [...sett.map(s=>`Asentamiento: ${s.name} (${s.tier}, pob. ${s.population})`),
+     ...mons.map(m=>`Amenaza: ${m.name} · nivel ${Math.round(Number(m.threat))}`),
+     ...sites.map(s=>`Sitio: ${s.name} · ${s.site_type}`)].forEach(t=>{
+       const row=document.createElement("div");row.className="strategic-system";row.textContent=t;systems.append(row);
+     });
+  }
+  function relationFor(civId){
+    const d=strategicData(),p=playerCiv();
+    return (d?.relations||[]).find(r=>{
+      const ids=[Number(r.civilization_a_id),Number(r.civilization_b_id)];
+      return ids.includes(Number(p?.id))&&ids.includes(Number(civId));
+    })||null;
+  }
+  function showCivilizationDetail(civId){
+    const d=strategicData(),c=d?.civilizations?.find(x=>Number(x.id)===Number(civId)); if(!c)return;
+    selectedStrategic={type:"civilization",id:Number(c.id)};
+    const rel=c.player_controlled?null:relationFor(c.id);
+    $("#strategicInfoKicker").textContent=c.player_controlled?"TU CIVILIZACIÓN":"CIVILIZACIÓN";
+    $("#strategicInfoTitle").textContent=c.name;
+    $("#strategicInfoText").textContent=`${c.culture} · ${c.government}${c.religion?" · "+c.religion:""}`;
+    const stats=$("#strategicStats");stats.innerHTML="";
+    for(const [k,v] of [
+      ["Población",Math.round(Number(c.population||0))],["Riqueza",Math.round(Number(c.wealth||0))],
+      ["Fuerza",Math.round(Number(c.military_power||0))],["Tecnología",Number(c.tech_level||0).toFixed(1)],
+      ["Estabilidad",Math.round(Number(c.stability||0))+"%"],["Relación",c.player_controlled?"—":rel?.stance||c.known_state]
+    ]){
+      const box=document.createElement("div");box.innerHTML=`<span>${k}</span><strong>${v}</strong>`;stats.append(box);
+    }
+    const actions=$("#strategicActions");actions.innerHTML="";
+    if(!c.player_controlled&&known(c.known_state)){
+      const options=rel?.at_war?[["peace","Proponer paz",""]]:[
+        ["contact","Enviar emisario",""],["trade","Proponer comercio",""],["war","Declarar guerra","war"]
+      ];
+      for(const [action,label,cls] of options){
+        const b=document.createElement("button");b.textContent=label;if(cls)b.className=cls;
+        b.onclick=()=>performStrategicAction(action,c.id);actions.append(b);
+      }
+    }
+    const systems=$("#strategicSystems");systems.innerHTML="";
+    if(rel){
+      const r=document.createElement("div");r.className="strategic-system";
+      r.innerHTML=`<strong>Relación:</strong> confianza ${Math.round(Number(rel.trust||0))} · tensión ${Math.round(Number(rel.tension||0))} · comercio ${rel.trade_active?"activo":"no"} · guerra ${rel.at_war?"sí":"no"}`;
+      systems.append(r);
+    }
+  }
+  async function performStrategicAction(action,civId){
+    if(!liveMode)return;
+    try{
+      const response=await fetch("/api/strategy",{
+        method:"POST",credentials:"same-origin",
+        headers:{"Content-Type":"application/json","Accept":"application/json"},
+        body:JSON.stringify({action,civilization_id:civId})
+      });
+      if(!response.ok)throw new Error("strategy "+response.status);
+      const strategic=await response.json();
+      liveSnapshot.strategic=strategic;
+      renderStrategicMap();
+      showCivilizationDetail(civId);
+      showActivity("La decisión estratégica fue transmitida al reino.");
+    }catch{
+      showActivity("No se pudo aplicar la acción estratégica.");
+    }
+  }
+  function renderStrategicMap(){
+    const d=strategicData(),svg=$("#strategicMap"); if(!d||!svg)return;
+    svg.innerHTML="";
+    strategicOverview(strategicSection);
+    const p=playerCiv();
+    const centerRadius=strategicScale==="region"?4:strategicScale==="kingdom"?7:99;
+
+    for(const r of d.regions||[]){
+      const pos=mapCoords(Number(r.x),Number(r.y));
+      const dist=Math.abs(Number(r.x))+Math.abs(Number(r.y));
+      const isKnown=known(r.knowledge_state);
+      const owner=civById(r.controller_civilization_id);
+      const fill=!isKnown?"#202720":biomeColor(r.biome);
+      const opacity=strategicScale==="region"&&dist>centerRadius?.12:isKnown?.86:.48;
+      const rect=svgEl("rect",{
+        x:pos.x,y:pos.y,width:pos.cw-2,height:pos.ch-2,rx:5,
+        fill,opacity,class:"world-cell",
+        stroke:r.contested?"#d27a61":owner?.color||"rgba(230,220,190,.12)",
+        "stroke-width":owner?3:1
+      });
+      rect.addEventListener("click",()=>showRegionDetail(r));
+      svg.append(rect);
+      if(isKnown&&strategicScale!=="world"){
+        const label=svgEl("text",{x:pos.x+5,y:pos.y+12,class:"world-region-label",opacity:.58});
+        label.textContent=r.biome.slice(0,3).toUpperCase();
+        svg.append(label);
+      }
+    }
+
+    // Roads between adjacent controlled/settled cells
+    for(const r of (d.regions||[]).filter(x=>known(x.knowledge_state)&&Number(x.road_level)>0)){
+      const a=mapCoords(Number(r.x),Number(r.y));
+      const neighbors=(d.regions||[]).filter(n=>known(n.knowledge_state)&&Number(n.road_level)>0&&Math.abs(Number(n.x)-Number(r.x))+Math.abs(Number(n.y)-Number(r.y))===1);
+      for(const n of neighbors){
+        if(Number(n.y)<Number(r.y)||(Number(n.y)===Number(r.y)&&Number(n.x)<Number(r.x)))continue;
+        const b=mapCoords(Number(n.x),Number(n.y));
+        const line=svgEl("line",{
+          x1:a.x+a.cw/2,y1:a.y+a.ch/2,x2:b.x+b.cw/2,y2:b.y+b.ch/2,
+          stroke:"#c7ae77","stroke-width":Math.min(5,1+Number(r.road_level)),opacity:.55
+        });svg.append(line);
+      }
+    }
+
+    for(const s of d.settlements||[]){
+      const civ=civById(s.civilization_id);
+      if(!known(s.known_state)&&!civ?.player_controlled)continue;
+      const pos=mapCoords(Number(s.x),Number(s.y));
+      const g=svgEl("g",{class:"world-marker"});
+      const circle=svgEl("circle",{cx:pos.x+pos.cw/2,cy:pos.y+pos.ch/2,r:s.tier==="ciudad"?9:s.tier==="pueblo"?7:5,fill:civ?.color||"#d6c18b",stroke:"#f3e8c8","stroke-width":1.5});
+      const t=svgEl("text",{x:pos.x+pos.cw/2+10,y:pos.y+pos.ch/2+3});t.textContent=s.name;
+      g.append(circle,t);g.addEventListener("click",e=>{e.stopPropagation();showCivilizationDetail(s.civilization_id)});svg.append(g);
+    }
+    for(const a of d.armies||[]){
+      const civ=civById(a.civilization_id); if(!civ?.player_controlled&&!known(civ?.known_state))continue;
+      const pos=mapCoords(Number(a.x),Number(a.y));
+      const g=svgEl("g",{class:"world-marker"});
+      const icon=svgEl("text",{x:pos.x+pos.cw/2-7,y:pos.y+pos.ch/2-8,fill:"#f0d487"});icon.textContent="⚔";
+      g.append(icon);g.addEventListener("click",()=>showCivilizationDetail(a.civilization_id));svg.append(g);
+    }
+    for(const m of d.monsters||[]){
+      if(!known(m.known_state))continue;
+      const pos=mapCoords(Number(m.x),Number(m.y));
+      const g=svgEl("g",{class:"world-marker"});
+      const icon=svgEl("text",{x:pos.x+pos.cw/2-7,y:pos.y+pos.ch/2+4,fill:"#d66d5f"});icon.textContent="◆";
+      const title=svgEl("title");title.textContent=m.name+" · amenaza "+Math.round(Number(m.threat));
+      g.append(icon,title);svg.append(g);
+    }
+    for(const s of d.sites||[]){
+      if(!known(s.known_state))continue;
+      const pos=mapCoords(Number(s.x),Number(s.y));
+      const g=svgEl("g",{class:"world-marker"});
+      const icon=svgEl("text",{x:pos.x+pos.cw/2+8,y:pos.y+pos.ch/2+12,fill:"#c8b97c"});icon.textContent=s.site_type==="artifact"?"✦":"⌂";
+      const title=svgEl("title");title.textContent=s.name;
+      g.append(icon,title);svg.append(g);
+    }
+
+    document.querySelectorAll("[data-map-scale]").forEach(b=>b.classList.toggle("active",b.dataset.mapScale===strategicScale));
+  }
+
   const config={
     type:Phaser.AUTO,parent:"game",backgroundColor:"#71885f",
     width:1280,height:760,physics:{default:"arcade",arcade:{debug:false}},
@@ -1746,27 +2035,71 @@
   };
   new Phaser.Game(config);
 
-  document.querySelectorAll("[data-speed]").forEach(btn=>btn.addEventListener("click",()=>{
+  document.querySelectorAll("[data-speed]").forEach(btn=>btn.addEventListener("click",async()=>{
+    const previous=timeScale;
     timeScale=Number(btn.dataset.speed);
     document.querySelectorAll("[data-speed]").forEach(b=>b.classList.toggle("active",b===btn));
     showActivity(timeScale===0?"El mundo está en pausa.":`El tiempo avanza a velocidad ×${timeScale}.`);
+    if(liveMode){
+      try{
+        const response=await fetch("/api/speed",{
+          method:"POST",credentials:"same-origin",
+          headers:{"Content-Type":"application/json","Accept":"application/json"},
+          body:JSON.stringify({speed:timeScale})
+        });
+        if(!response.ok)throw new Error("speed "+response.status);
+        const snapshot=await response.json();
+        sceneRef?.applySnapshot(snapshot,false);
+      }catch{
+        timeScale=previous;
+        document.querySelectorAll("[data-speed]").forEach(b=>b.classList.toggle("active",Number(b.dataset.speed)===timeScale));
+        showActivity("No se pudo cambiar la velocidad persistente.");
+      }
+    }
   }));
-  $("zoomIn").addEventListener("click",()=>{if(sceneRef){const c=sceneRef.cameras.main;c.setZoom(clamp(c.zoom+.12,.48,1.45))}});
+  document.querySelectorAll("[data-map-scale]").forEach(btn=>btn.addEventListener("click",()=>{
+    const scale=btn.dataset.mapScale;
+    if(scale==="local"){closeStrategicView();showActivity("Regresaste a la vista local del asentamiento.");return;}
+    strategicScale=scale;
+    strategicSection=scale==="region"?"region":scale==="kingdom"?"kingdom":"world";
+    renderStrategicMap();
+  }));
+  $("worldMapJump")?.addEventListener("click",()=>openStrategicView("world","world"));
+
+    $("zoomIn").addEventListener("click",()=>{if(sceneRef){const c=sceneRef.cameras.main;c.setZoom(clamp(c.zoom+.12,.48,1.45))}});
   $("zoomOut").addEventListener("click",()=>{if(sceneRef){const c=sceneRef.cameras.main;c.setZoom(clamp(c.zoom-.12,.48,1.45))}});
   $("centerCamera").addEventListener("click",()=>{if(sceneRef){sceneRef.cameras.main.pan(1080,720,450,"Sine.easeInOut")}});
   document.querySelectorAll("[data-view]").forEach(btn=>btn.addEventListener("click",()=>{
     if(!sceneRef)return;
     const view=btn.dataset.view;
     if(view==="village"){
+      closeStrategicView();
       sceneRef.cameras.main.pan(1080,720,450,"Sine.easeInOut");
       showActivity("Vista centrada en el asentamiento.");
+    }else if(view==="world"){
+      openStrategicView("world","world");
+      showActivity("Vista mundial: territorios, civilizaciones y amenazas.");
+    }else if(view==="kingdom"){
+      openStrategicView("kingdom","kingdom");
+      showActivity("Vista de reino: fronteras, asentamientos e instituciones.");
+    }else if(view==="diplomacy"){
+      openStrategicView("diplomacy","kingdom");
+      showActivity("Diplomacia: relaciones, comercio, rivalidad y guerra.");
+    }else if(view==="military"){
+      openStrategicView("military","kingdom");
+      showActivity("Ejército: fuerzas y campañas visibles en el mapa.");
+    }else if(view==="knowledge"){
+      openStrategicView("knowledge","kingdom");
+      showActivity("Conocimiento e instituciones de la civilización.");
     }else if(view==="people"){
+      closeStrategicView();
       const target=sceneRef.people.find(p=>p.person.followed)||sceneRef.people.slice().sort((a,b)=>(b.person.prestige||0)-(a.person.prestige||0))[0];
       if(target){
         selectPerson(target);
         sceneRef.cameras.main.pan(target.x,target.y,400,"Sine.easeInOut");
       }
     }else if(view==="resources"){
+      closeStrategicView();
       const s=liveSnapshot?.settlement;
       const inv=liveSnapshot?.inventories||[];
       const storedFood=inv.filter(i=>i.resource_type==="food").reduce((sum,i)=>sum+Number(i.quantity||0),0);
@@ -1776,14 +2109,16 @@
       const territorialStone=regions.reduce((sum,r)=>sum+Number(r.stone_stock||0),0);
       showActivity(s?`Reservas: ${Math.round(Number(s.food||0))} comida (${Math.round(storedFood)} almacenada · ${Math.round(transitFood)} en tránsito) · ${Math.round(Number(s.wood||0))} madera almacenada + ${Math.round(territorialWood)} en territorio · ${Math.round(Number(s.stone||0))} piedra almacenada + ${Math.round(territorialStone)} en territorio.`:"Los recursos aparecerán al conectar la simulación persistente.");
     }else if(view==="explore"){
-      sceneRef.cameras.main.pan(ZONES.explore.x,ZONES.explore.y,500,"Sine.easeInOut");
-      showActivity("La cámara se desplaza hacia la frontera de exploración.");
+      openStrategicView("region","region");
+      showActivity("Vista regional: frontera, rutas, expediciones y territorio por descubrir.");
     }else if(view==="council"){
+      closeStrategicView();
       const panel=document.querySelector(".command-bar");
       panel?.classList.add("attention");
       setTimeout(()=>panel?.classList.remove("attention"),850);
       showActivity("El consejo espera una orden estratégica.");
     }else if(view==="history"){
+      closeStrategicView();
       const panel=document.querySelector(".event-strip");
       panel?.classList.add("attention");
       setTimeout(()=>panel?.classList.remove("attention"),850);
