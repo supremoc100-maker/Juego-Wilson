@@ -212,7 +212,7 @@
       });
       streets.beginPath();streets.moveTo(1080,465);streets.lineTo(1080,1025);streets.strokePath();
       streets.lineStyle(22,0x887455,.52);
-      streets.beginPath();streets.moveTo(1310,735);streets.lineTo(1710,735);streets.strokePath();
+      streets.beginPath();streets.moveTo(1310,735);streets.lineTo(2100,735);streets.strokePath();
       streets.lineStyle(3,0xcab27c,.27);
       [580,700,820,940].forEach(y=>{
         streets.beginPath();streets.moveTo(805,y);streets.lineTo(1325,y);streets.strokePath();
