@@ -203,6 +203,22 @@
       p.lineStyle(6,0xc4aa78,.35);
       p.strokeCircle(1080,720,165);
 
+      // Calles internas: las viviendas crecen en bloques a ambos lados
+      // del eje central; almacenes y talleres usan un corredor de servicio.
+      const streets=this.add.graphics().setDepth(-9);
+      streets.lineStyle(24,0x95815f,.58);
+      [580,700,820,940].forEach(y=>{
+        streets.beginPath();streets.moveTo(805,y);streets.lineTo(1325,y);streets.strokePath();
+      });
+      streets.beginPath();streets.moveTo(1080,465);streets.lineTo(1080,1025);streets.strokePath();
+      streets.lineStyle(22,0x887455,.52);
+      streets.beginPath();streets.moveTo(1310,735);streets.lineTo(1710,735);streets.strokePath();
+      streets.lineStyle(3,0xcab27c,.27);
+      [580,700,820,940].forEach(y=>{
+        streets.beginPath();streets.moveTo(805,y);streets.lineTo(1325,y);streets.strokePath();
+      });
+      streets.beginPath();streets.moveTo(1080,465);streets.lineTo(1080,1025);streets.strokePath();
+
       // trees
       for(let i=0;i<120;i++){
         const h=hash("tree"+i);
