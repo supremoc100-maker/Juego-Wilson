@@ -177,8 +177,10 @@ h1{font-size:24px;line-height:1.05;margin-top:2px}
 
 .side-nav{
   position:absolute;left:12px;top:68px;z-index:11;
-  display:flex;flex-direction:column;gap:7px;
+  display:flex;flex-direction:column;gap:6px;
+  max-height:calc(100% - 150px);overflow:auto;scrollbar-width:none;padding-right:2px;
 }
+.side-nav::-webkit-scrollbar{display:none}
 .side-nav button{
   width:62px;min-height:58px;border:1px solid rgba(211,183,111,.28);
   border-radius:8px;background:rgba(13,21,16,.88);color:#e9e5d5;
