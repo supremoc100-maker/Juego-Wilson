@@ -75,6 +75,9 @@
           <button type="button" class="hud-btn" data-speed="20">×20</button>
           <button type="button" class="hud-btn" data-speed="60">×60</button>
           <button type="button" class="hud-btn" data-speed="100">×100</button>
+          <button type="button" class="hud-btn" data-speed="20">×20</button>
+          <button type="button" class="hud-btn" data-speed="60">×60</button>
+          <button type="button" class="hud-btn" data-speed="100">×100</button>
         </div>
         <div class="camera-controls">
           <button type="button" class="hud-btn" id="zoomOut" aria-label="Alejar">−</button>
@@ -84,6 +87,8 @@
       </div>
 
       <nav class="side-nav" aria-label="Secciones de Wilson">
+        <button type="button" data-view="world"><span>◎</span><small>Mundo</small></button>
+        <button type="button" data-view="kingdom"><span>♜</span><small>Reino</small></button>
         <button type="button" data-view="village"><span>⌂</span><small>Aldea</small></button>
         <button type="button" data-view="world"><span>◉</span><small>Mundo</small></button>
         <button type="button" data-view="kingdom"><span>♜</span><small>Reino</small></button>
@@ -133,6 +138,43 @@
         </div>
         <div id="buildingDetail" class="building-detail">Selecciona una estructura del asentamiento para inspeccionarla.</div>
       </aside>
+
+      <section id="strategicPanel" class="strategic-panel hidden" aria-label="Vista estratégica">
+        <div class="strategic-header">
+          <div>
+            <span class="kicker">WILSON · MAPA ESTRATÉGICO</span>
+            <h2 id="strategicTitle">Mundo conocido</h2>
+            <p id="strategicSubtitle">Territorio, civilizaciones, rutas, amenazas y expansión histórica.</p>
+          </div>
+          <div class="strategic-scale-tabs">
+            <button type="button" data-strategic-scale="region">Región</button>
+            <button type="button" data-strategic-scale="kingdom">Reino</button>
+            <button type="button" data-strategic-scale="world" class="active">Mundo</button>
+            <button type="button" id="closeStrategic">Volver a la aldea</button>
+          </div>
+        </div>
+        <div class="strategic-metrics" id="strategicMetrics"></div>
+        <div class="strategic-layout">
+          <div class="world-map-shell">
+            <div id="strategicMap" class="strategic-map" aria-label="Mapa de regiones"></div>
+            <div class="map-legend">
+              <span>◆ Asentamiento</span><span>⚔ Ejército</span><span>☠ Monstruo</span><span>◇ Ruina/sitio</span><span>▓ Territorio</span>
+            </div>
+          </div>
+          <aside class="strategic-inspector">
+            <div class="strategic-domain-tabs">
+              <button type="button" data-strategic-domain="summary" class="active">Resumen</button>
+              <button type="button" data-strategic-domain="diplomacy">Diplomacia</button>
+              <button type="button" data-strategic-domain="military">Ejército</button>
+              <button type="button" data-strategic-domain="economy">Economía</button>
+              <button type="button" data-strategic-domain="politics">Política</button>
+              <button type="button" data-strategic-domain="knowledge">Conocimiento</button>
+              <button type="button" data-strategic-domain="threats">Amenazas</button>
+            </div>
+            <div id="strategicInspectorBody" class="strategic-inspector-body"></div>
+          </aside>
+        </div>
+      </section>
 
       <aside class="objectives-panel" aria-label="Prioridades del consejo">
         <span class="kicker">PRIORIDADES DEL CONSEJO</span>
