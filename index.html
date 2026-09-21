@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#111b15" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <title>Wilson — Civilizaciones vivas</title>
-  <link rel="stylesheet" href="./styles.css?v=36" />
+  <link rel="stylesheet" href="./styles.css?v=37" />
 </head>
 <body>
   <main class="app-shell">
@@ -31,12 +31,50 @@
     <section class="game-stage">
       <div id="game"></div>
 
+      <section id="strategicView" class="strategic-view hidden" aria-label="Mapa estratégico">
+        <header class="strategic-header">
+          <div>
+            <span class="kicker">MAPA ESTRATÉGICO</span>
+            <h2 id="strategicTitle">Mundo conocido</h2>
+            <p id="strategicSubtitle">Territorio, civilizaciones, rutas y amenazas.</p>
+          </div>
+          <div class="strategic-scale-tabs" role="tablist" aria-label="Escala del mapa">
+            <button type="button" data-map-scale="local">Local</button>
+            <button type="button" data-map-scale="region">Región</button>
+            <button type="button" data-map-scale="kingdom">Reino</button>
+            <button type="button" data-map-scale="world" class="active">Mundo</button>
+          </div>
+        </header>
+        <div class="strategic-body">
+          <div class="strategic-map-wrap">
+            <svg id="strategicMap" viewBox="0 0 1100 720" role="img" aria-label="Mapa del mundo de Wilson"></svg>
+            <div id="strategicLegend" class="strategic-legend">
+              <span><i class="legend-owned"></i>Tu civilización</span>
+              <span><i class="legend-foreign"></i>Otros reinos</span>
+              <span><i class="legend-monster"></i>Amenazas</span>
+              <span><i class="legend-unknown"></i>Desconocido</span>
+            </div>
+          </div>
+          <aside class="strategic-info">
+            <span class="kicker" id="strategicInfoKicker">MUNDO</span>
+            <h3 id="strategicInfoTitle">Selecciona una región o civilización</h3>
+            <p id="strategicInfoText">Explora el mapa para conocer territorios, asentamientos, rutas, ejércitos, ruinas y amenazas.</p>
+            <div id="strategicStats" class="strategic-stats"></div>
+            <div id="strategicActions" class="strategic-actions"></div>
+            <div id="strategicSystems" class="strategic-systems"></div>
+          </aside>
+        </div>
+      </section>
+
       <div class="top-hud" aria-label="Controles del juego">
         <div class="speed-controls">
           <button type="button" class="hud-btn" data-speed="0" aria-label="Pausar">Ⅱ</button>
           <button type="button" class="hud-btn active" data-speed="1">×1</button>
           <button type="button" class="hud-btn" data-speed="3">×3</button>
           <button type="button" class="hud-btn" data-speed="8">×8</button>
+          <button type="button" class="hud-btn" data-speed="20">×20</button>
+          <button type="button" class="hud-btn" data-speed="60">×60</button>
+          <button type="button" class="hud-btn" data-speed="100">×100</button>
         </div>
         <div class="camera-controls">
           <button type="button" class="hud-btn" id="zoomOut" aria-label="Alejar">−</button>
@@ -47,11 +85,15 @@
 
       <nav class="side-nav" aria-label="Secciones de Wilson">
         <button type="button" data-view="village"><span>⌂</span><small>Aldea</small></button>
+        <button type="button" data-view="world"><span>◉</span><small>Mundo</small></button>
+        <button type="button" data-view="kingdom"><span>♜</span><small>Reino</small></button>
         <button type="button" data-view="people"><span>♟</span><small>Habitantes</small></button>
         <button type="button" data-view="resources"><span>▣</span><small>Recursos</small></button>
-        <button type="button" data-view="explore"><span>⌖</span><small>Exploración</small></button>
+        <button type="button" data-view="diplomacy"><span>⚑</span><small>Diplomacia</small></button>
+        <button type="button" data-view="military"><span>⚔</span><small>Ejército</small></button>
+        <button type="button" data-view="knowledge"><span>✦</span><small>Conocimiento</small></button>
         <button type="button" data-view="council"><span>⚖</span><small>Consejo</small></button>
-        <button type="button" data-view="history"><span>☷</span><small>Registro</small></button>
+        <button type="button" data-view="history"><span>☷</span><small>Historia</small></button>
         <button type="button" id="newGameBtn" class="danger-nav"><span>↻</span><small>Nueva partida</small></button>
       </nav>
 
@@ -100,10 +142,10 @@
         </div>
       </aside>
 
-      <div class="mini-map-frame" aria-hidden="true">
-        <span>MAPA</span>
-        <b>N</b>
-      </div>
+      <button type="button" id="worldMapJump" class="world-map-jump" aria-label="Abrir mapa estratégico">
+        <span>MAPA ESTRATÉGICO</span>
+        <strong>Región · Reino · Mundo</strong>
+      </button>
 
       <section class="event-strip">
         <div class="event-heading">
@@ -147,7 +189,7 @@
   </main>
 
   <script src="./vendor/phaser-3.90.0.min.js"></script>
-  <script src="./src/game.js?v=36"></script>
+  <script src="./src/game.js?v=37"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));
